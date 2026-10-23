@@ -18,7 +18,7 @@ target:
   image: null
 policy:
   gpu: same-model-first               # 같은 리전이라 T4(g4dn) 후보가 있으면 그것
-  image: ubuntu-24.04                 # 추천 이미지가 24.04 이고 드라이버가 driver_series 와 같으면 그대로, 아니면 기본 24.04 로 바꾼다
+  image: source                      # 소스와 같은 OS · 버전 (WidgetRAG 소스는 24.04) — 추천 이미지가 그 OS 이고 드라이버가 driver_series 와 같으면 그대로, 아니면 그 OS 기본 이미지로 바꾼다
   driver_series: "595"                # 소스에 설치된 드라이버 시리즈 (WidgetRAG 가 고정 설치)
   root_disk_gb: 100
   open_ports:

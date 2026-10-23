@@ -17,7 +17,7 @@ target:
   image: ami-0d222b26b6fb4eeed        # Tumblebug 이미지 ID = AMI (ubuntu-noble-24.04 server 20260923, 10/16 Shell VM 과 같은 것). 없으면 searchImage 로 'ubuntu 24.04
 policy:
   gpu: same-model-first
-  image: ubuntu-24.04
+  image: source                      # 소스와 같은 OS · 버전 (WidgetRAG 소스는 Ubuntu 24.04) — target.image 가 있으면 그것을 쓴다
   root_disk_gb: 100
   open_ports:
     - { port: 80, cidr: "${GMP_WEB_ALLOW_CIDR}" }   # 사무실 공인 IP/32 같은 출발지 — 공인 IP 로 화면 확인용 (결정 필요: 개방 범위)

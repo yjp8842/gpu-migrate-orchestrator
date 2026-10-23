@@ -26,7 +26,7 @@ target:
 
 policy:
   gpu: same-model-first               # same-model-first: 같은 칩 우선, 없으면 VRAM 이상 중 가장 가까운 것 | vram-at-least
-  image: ubuntu-24.04                 # 도구 기본값과 다름(source = 소스와 같은 OS · 버전) — 추천 이미지가 이 OS 이고 드라이버가 driver_series 면 그대로, 아니면 기본 이미지로 바꾼다 | keep
+  image: source                      # 소스와 같은 OS · 버전 — 추천 이미지가 그 OS 이고 드라이버가 driver_series 면 그대로, 아니면 그 OS 기본 이미지로 바꾼다 | ubuntu-24.04 처럼 고정 | keep (Beetle 추천 그대로)
   driver_series: "595"                # 워크로드가 설치하는 NVIDIA 드라이버 시리즈
   root_disk_gb: 100
   open_ports:                         # 타겟에 더 열 포트 — 비우면 [] (22 는 Beetle · Tumblebug 가 연다). WidgetRAG 80 · LexAI 네이티브 3000
