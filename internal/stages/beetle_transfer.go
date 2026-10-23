@@ -7,6 +7,10 @@ package stages
 //	 strategy: auto|direct|relay, encryptionKeyId}
 //
 // privateKey 는 Tumblebug 에서 메모리로 받아 바로 암호화한다(파일로 두지 않는다). 비동기(Prefer: respond-async) + 우리가 정한 X-Request-Id.
+//
+// 경로는 각 VM 의 홈 기준 절대 경로로 넘긴다. direct(에이전트 포워딩)는 소스 VM 에서
+// `rsync -avz -e 'ssh …' <소스 경로>/ <user>@<타겟>:<타겟 경로>` 를 돌리는데, 타겟 쪽 `~` 는 소스 셸이 풀지 않고 rsync 에 맡겨진다.
+// relay 는 양쪽이 모두 원격 경로가 된다. 그 처리에 기대지 않으려고 `~/` 를 미리 푼다. rsync 는 두 VM 모두에 있어야 한다.
 
 import (
 	"fmt"
@@ -18,6 +22,49 @@ import (
 	"gpu-migrate-orchestrator/internal/jsonx"
 	"gpu-migrate-orchestrator/internal/textx"
 )
+
+// RsyncCheck 는 rsync 가 있는지 보고 없으면 설치한다 (마지막 줄이 실패하면 설치도 못 한 것).
+const RsyncCheck = `if command -v rsync >/dev/null 2>&1; then echo present; else sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q rsync >/dev/null && echo installed; fi; command -v rsync >/dev/null`
+
+// absPath 는 `~/` 로 시작하는 경로를 그 VM 의 홈 기준 절대 경로로 바꾼다.
+func absPath(ctx *Context, role, p string) (string, error) {
+	if p != "~" && !strings.HasPrefix(p, "~/") {
+		return p, nil
+	}
+	out, err := ctx.ExecOK(role, `printf '%s\n' "$HOME"`, 2)
+	if err != nil {
+		return "", err
+	}
+	home := strings.TrimRight(strings.TrimSpace(out), "/")
+	if !strings.HasPrefix(home, "/") {
+		return "", Errf("%s VM 의 홈 경로를 읽지 못했습니다: %q", role, out)
+	}
+	return home + strings.TrimPrefix(p, "~"), nil
+}
+
+// prepareBeetleEnds 는 두 VM 에 rsync 를 갖추고, Beetle 에 넘길 절대 경로를 돌려준다.
+func prepareBeetleEnds(ctx *Context, outDir, pkg string) (string, string, error) {
+	for _, role := range []string{"source", "target"} {
+		out, err := ctx.ExecOK(role, RsyncCheck, 5)
+		if err != nil {
+			return "", "", Errf("%s VM 에 rsync 가 없고 설치하지 못했습니다 — Beetle 이관은 두 VM 모두 rsync 가 필요합니다: %v", role, err)
+		}
+		if strings.Contains(out, "installed") {
+			ctx.Log.Info(stTransfer, "%s VM 에 rsync 설치", role)
+		}
+	}
+	src, err := absPath(ctx, "source", outDir)
+	if err != nil {
+		return "", "", err
+	}
+	dst, err := absPath(ctx, "target", pkg)
+	if err != nil {
+		return "", "", err
+	}
+	ctx.State.SetKey("beetle_paths", M{"source": src, "destination": dst})
+	ctx.Log.Info(stTransfer, "Beetle 경로: 소스 %s → 타겟 %s", src, dst)
+	return src, dst, nil
+}
 
 func beetleSide(node M, keyPEM string, enc *crypto.Encryptor, path string) (M, error) {
 	ek, err := enc.Encrypt(keyPEM)
@@ -73,6 +120,10 @@ func transferViaBeetle(ctx *Context, outDir, pkg string) error {
 	}
 	rid := ctx.State.KeyS("beetle_data_req")
 	if rid == "" {
+		srcPath, dstPath, err := prepareBeetleEnds(ctx, outDir, pkg)
+		if err != nil {
+			return err
+		}
 		rid = fmt.Sprintf("gmp-%s-data", ctx.State.Data.RunID)
 		if n := len(jsonx.AsList(ctx.State.Key("beetle_data_req_tries"))); n > 0 {
 			rid = fmt.Sprintf("%s-%d", rid, n+1) // 다시 보내는 요청은 새 ID 로
@@ -86,7 +137,7 @@ func transferViaBeetle(ctx *Context, outDir, pkg string) error {
 		if err != nil {
 			return err
 		}
-		body, err := BuildBeetleBody(ctx, enc, outDir, pkg, rid)
+		body, err := BuildBeetleBody(ctx, enc, srcPath, dstPath, rid)
 		if err != nil {
 			return err
 		}

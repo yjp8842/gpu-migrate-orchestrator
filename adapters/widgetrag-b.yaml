@@ -6,7 +6,7 @@ repo_raw: https://raw.githubusercontent.com/ghd329/WidgetRAG
 branch: feat/20260922-change-sqlite
 entry: "set -o pipefail; curl -fsSL {repo_raw}/{branch}/scripts/compose/deploy.sh | {env} bash"
 rebuild: null                     # compose 는 재빌드가 없다 — 결정적 설정은 .env 에 있어 재기동만 (restart)
-restart: "cd ~/widgetrag-deploy && {env} bash deploy.sh"
+restart: "cd ~/widgetrag-deploy && {source_env} bash deploy.sh"   # 소스용 — LLM 설정만 (COMPARE 가 붙으면 소스에서 이관 비교를 돈다)
 backup: "cd ~/widgetrag-deploy && GOLDEN={golden} RUNTIME=compose COMPOSE_DIR=$HOME/widgetrag-deploy bash package.sh backup {out_dir}"
 backup_out: "~/widgetrag-backup/{ts}"
 package_dir: "~/widgetrag-deploy/package"

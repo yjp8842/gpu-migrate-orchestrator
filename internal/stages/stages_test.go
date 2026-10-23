@@ -119,6 +119,7 @@ type fakeBeetle struct {
 	// 데이터 이관 — 보낸 요청 ID 와 요청별 상태
 	pub        string
 	sent       []string
+	bodies     []M
 	sendStatus string
 	reqs       map[string]M
 }
@@ -130,6 +131,7 @@ func (b *fakeBeetle) MigrateInfra(ns string, body M, seed string, use bool, to t
 func (b *fakeBeetle) EncryptionKey() (M, error) { return M{"keyId": "k1", "publicKey": b.pub}, nil }
 func (b *fakeBeetle) DataMigration(body M, xreq string) (string, error) {
 	b.sent = append(b.sent, xreq)
+	b.bodies = append(b.bodies, body)
 	st := b.sendStatus
 	if st == "" {
 		st = "success"
@@ -556,6 +558,10 @@ func transferCtx(t *testing.T, verifyOK *bool) (*Context, *fakeTB, *fakeBeetle) 
 			return rcMarker + "3\n"
 		case strings.Contains(cmd, "if [ -e"):
 			return "moved\n" + ok
+		case strings.Contains(cmd, "command -v rsync"):
+			return "present\n" + ok
+		case strings.Contains(cmd, `"$HOME"`):
+			return "/home/cb-user\n" + ok
 		case strings.Contains(cmd, "gmp-precmd.txt") || strings.Contains(cmd, "gmp-postcmd.txt"):
 			return "gmp-hook " + last + "\n" + ok
 		case strings.Contains(cmd, "sha256sum -c"):
@@ -606,6 +612,77 @@ func TestTransferResendsFailedBeetleRequest(t *testing.T) {
 	}
 	if h := jsonx.AsM(ctx.State.Key("beetle_hooks")); h["preCmd_ran"] != true || h["postCmd_ran"] != true {
 		t.Fatalf("훅 확인 %v", h)
+	}
+	body := fb.bodies[0]
+	if src, dst := jsonx.S(jsonx.AsM(body["source"]), "path"), jsonx.S(jsonx.AsM(body["destination"]), "path"); src != "/home/cb-user/widgetrag-backup/20261022-1/" || dst != "/home/cb-user/widgetrag-package" {
+		t.Fatalf("Beetle 경로가 절대 경로가 아니다: %s → %s", src, dst)
+	}
+	if cmdsWith(tb, "command -v rsync") != 2 {
+		t.Fatal("두 VM 의 rsync 를 확인하지 않았다", tb.cmds)
+	}
+}
+
+func TestTransferStopsWithoutRsync(t *testing.T) {
+	ok := true
+	ctx, tb, fb := transferCtx(t, &ok)
+	base := tb.cmdOut
+	tb.cmdOut = func(cmd string) string {
+		if strings.Contains(cmd, "command -v rsync") {
+			return "E: Unable to locate package rsync\n" + rcMarker + "1\n"
+		}
+		return base(cmd)
+	}
+	if _, err := runTransfer(ctx); err == nil || !strings.Contains(err.Error(), "rsync") {
+		t.Fatalf("rsync 없이 넘어갔다: %v", err)
+	}
+	if len(fb.sent) != 0 || ctx.State.KeyS("beetle_data_req") != "" {
+		t.Fatal("rsync 가 없는데 Beetle 요청을 보냈거나 요청 ID 를 적었다")
+	}
+}
+
+func TestAbsPath(t *testing.T) {
+	tb := &fakeTB{cmdOut: func(string) string { return "/home/cb-user/\n" + rcMarker + "0\n" }}
+	ctx := sourceCtx(t, tb)
+	for in, want := range map[string]string{"~/a/b": "/home/cb-user/a/b", "~": "/home/cb-user", "/opt/x": "/opt/x"} {
+		if got, err := absPath(ctx, "source", in); err != nil || got != want {
+			t.Fatalf("%s → %s (%v)", in, got, err)
+		}
+	}
+	tb.cmdOut = func(string) string { return "\n" + rcMarker + "0\n" }
+	if _, err := absPath(ctx, "source", "~/a"); err == nil {
+		t.Fatal("빈 홈을 받아들였다")
+	}
+}
+
+// ---------- 소스 명령에 넘기는 값 ----------
+
+func TestSourceCommandsGetOnlyLLMSettings(t *testing.T) {
+	ctx := newCtx(t, &fakeTB{}, nil, false)
+	raw := caseRaw()
+	raw["run"] = M{"env": M{"LLM_TEMPERATURE": "0", "LLM_SEED": "42", "COMPARE": "1", "CODE_SOURCE": "package", "VERIFY_ADMIN_PASSWORD": "pw"}}
+	c, err := config.NewCase(filepath.Join(t.TempDir(), "x.yaml"), raw, []string{"LLM_TEMPERATURE", "LLM_SEED", "COMPARE", "CODE_SOURCE", "VERIFY_ADMIN_PASSWORD"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.Case = c
+	rebuild, err := ctx.Remote("rebuild", nil)
+	if err != nil || rebuild != "cd ~/WidgetRAG/scripts/local && LLM_TEMPERATURE=0 LLM_SEED=42 ./40-start-apps.sh --rebuild" {
+		t.Fatalf("소스 재기동: %q %v", rebuild, err)
+	}
+	entry, _ := ctx.Remote("entry", nil)
+	for _, want := range []string{"FORM=t-case-target", "CODE_SOURCE=package", "COMPARE=1", "VERIFY_ADMIN_PASSWORD=pw"} {
+		if !strings.Contains(entry, want) {
+			t.Fatalf("타겟 단일 명령에 %s 가 없다: %s", want, entry)
+		}
+	}
+	ad, err := config.LoadAdapter("widgetrag-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.Adapter = ad
+	restart, _ := ctx.Remote("restart", nil)
+	if strings.Contains(restart, "COMPARE") || strings.Contains(restart, "FORM") || strings.Contains(restart, "PASSWORD") || !strings.Contains(restart, "LLM_SEED=42") {
+		t.Fatalf("Compose 소스 재기동에 타겟용 값이 섞였다: %s", restart)
 	}
 }
 

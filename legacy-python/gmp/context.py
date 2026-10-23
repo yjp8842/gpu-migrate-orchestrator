@@ -136,9 +136,17 @@ class Context:
         self.log.info(f"dry-run: {what}", stage)
 
     # ---------- 템플릿 ----------
+    # 소스 재기동에 넘기는 값 — 골든 전제(LLM temperature · seed)만. 타겟용 값(CODE_SOURCE · COMPARE · FORM · 비밀번호)은 넘기지 않는다
+    SOURCE_ENV_KEYS = ("LLM_TEMPERATURE", "LLM_SEED")
+
+    def source_env_str(self):
+        env = self.case.run.get("env") or {}
+        return env_string({k: str(env[k]) for k in env if k in self.SOURCE_ENV_KEYS})
+
     def remote(self, key, **values):
-        """어댑터의 명령 템플릿을 채운다. 어댑터 공통 변수(repo_raw · branch)는 자동으로 들어간다."""
-        base = {"repo_raw": self.adapter["repo_raw"], "branch": self.adapter["branch"], "env": self.env_str()}
+        """어댑터의 명령 템플릿을 채운다. repo_raw · branch · env(타겟용) · source_env(소스용)는 자동으로 들어간다."""
+        base = {"repo_raw": self.adapter["repo_raw"], "branch": self.adapter["branch"], "env": self.env_str(),
+                "source_env": self.source_env_str()}
         base.update(values)
         return self.adapter.render(key, **base)
 

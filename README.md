@@ -48,14 +48,14 @@ cp .env.example .env
 도구는 VM 에 SSH 로 접속하지 않는다. 로컬 PC 는 Tumblebug · Beetle API 에만 닿으면 되고, VM 의 22 포트에 닿지 않아도 된다.
 
 - **확인 · 읽기 · 스크립트는 Tumblebug 원격 명령.** 스크립트를 `bash -c` 로 감싸고 끝에 종료 코드 표식을 찍어 출력에서 읽는다. 파일은 `gzip | base64`, 폴더는 `tar.gz | base64` 로 받는다.
-- **패키지 이관은 Beetle 데이터 이관.** 개인키는 Tumblebug 에서 메모리로 받아 Beetle 암호화 봉투로 바로 감싼다 (파일로 두지 않는다). 대안 경로는 없어서 Beetle 이 안 되면 transfer 단계에서 멈춘다.
+- **패키지 이관은 Beetle 데이터 이관.** 개인키는 Tumblebug 에서 메모리로 받아 Beetle 암호화 봉투로 바로 감싼다 (파일로 두지 않는다). 대안 경로는 없어서 Beetle 이 안 되면 transfer 단계에서 멈춘다. 경로는 각 VM 의 `$HOME` 을 읽어 절대 경로로 넘긴다 — direct 는 소스 VM 에서 `rsync … <소스>/ <user>@<타겟>:<경로>` 를 돌리는데, 타겟 쪽 `~` 는 소스 셸이 풀지 않는다. 보내기 전에 두 VM 의 `rsync` 를 확인하고, 없으면 설치한다.
 - **관리자 비밀번호.** WidgetRAG 배포 스크립트의 기본 비밀번호로 소스 · 타겟이 같은 값으로 뜬다. 사례의 `run.env` 의 `VERIFY_ADMIN_PASSWORD` 가 환경변수 `GMP_VERIFY_ADMIN_PASSWORD` 로 같은 값을 받아 로그인 판정을 명시한다. 이관된 타겟은 소스 DB 의 계정을 그대로 쓰므로 이 값으로 로그인까지 판정한다. 이 값은 원격 명령에 실려 Tumblebug 명령 이력과 run 폴더에 남는다 (로그에서는 가린다).
 - **대신 생기는 것.** 확인할 때마다 Tumblebug 에 명령 기록이 남는다 (기동 확인 간격 `pacing.start_poll_sec`, 기본 60초). 재부팅 중에는 원격 명령이 닿지 않아 기다렸다가 다시 본다.
 
 ## 사례 · 어댑터 · 설정
 
 - `cases/*.yaml` — 이번 운행에서 바뀌는 값만: 소스 인프라, 타겟 CSP · 리전 · provider(beetle | tumblebug), 정책(GPU 선택 · 이미지 · 드라이버 시리즈 · 디스크 · 열 포트), 이관 방식(기본 beetle), run.env, cleanup.
-- `adapters/*.yaml` — 워크로드가 다른 점 전부: 단일 명령, 재기동 · 패키지 생성 명령, 패키지 경로, 결과 파일 위치, 기동 로그 위치, 재개 유닛, 상태 확인 위치. WidgetRAG 두 벌은 채워져 있고 LexAI 두 벌은 자리만 있다.
+- `adapters/*.yaml` — 워크로드가 다른 점 전부: 단일 명령, 재기동 · 패키지 생성 명령, 패키지 경로, 결과 파일 위치, 기동 로그 위치, 재개 유닛, 상태 확인 위치. WidgetRAG 두 벌은 채워져 있고 LexAI 두 벌은 자리만 있다. 명령 템플릿의 `{env}` 는 사례 `run.env` 전체(타겟 단일 명령용)이고, `{source_env}` 는 그중 `LLM_TEMPERATURE` · `LLM_SEED` 만이다(소스 재기동용 — `CODE_SOURCE` · `COMPARE` · `FORM` · 비밀번호는 소스에 넘기지 않는다).
 - `settings.example.yaml` — Tumblebug(이름별) · Beetle 주소와 계정, 증적 루트, 제한 시간, 호출 간격. 주소 · 계정은 환경변수로 받으므로 대개 그대로 쓴다. 고쳐 쓰려면 `settings.yaml` 로 복사한다 (gitignore, 있으면 이쪽을 먼저 읽는다).
 
 ## 환경변수

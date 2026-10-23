@@ -71,7 +71,7 @@ func runTransfer(ctx *Context) (M, error) {
 	}
 	pkg := ctx.Adapter.S("package_dir")
 	if ctx.DryRun {
-		ctx.Dry(stTransfer, "Beetle POST /migration/data", M{"source": M{"storageType": "filesystem", "path": strings.TrimRight(outDir, "/") + "/"},
+		ctx.Dry(stTransfer, "Beetle POST /migration/data (경로의 ~/ 는 실행 때 각 VM 의 홈 기준 절대 경로로 바꾼다)", M{"source": M{"storageType": "filesystem", "path": strings.TrimRight(outDir, "/") + "/"},
 			"destination": M{"storageType": "filesystem", "path": pkg}, "strategy": jsonx.S(ctx.Case.Transfer(), "strategy"), "encryptionKeyId": "<encryptionKey>"})
 		ctx.Dry(stTransfer, "Tumblebug cmd_sync(타겟) 패키지 대조", M{"command": []string{Wrap(strings.ReplaceAll(VerifyScript, "{pkg}", pkg))}})
 		return M{"dry_run": true}, nil

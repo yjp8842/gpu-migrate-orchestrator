@@ -153,9 +153,28 @@ func (c *Context) RunEnv() []config.KV {
 // EnvStr 은 RunEnv 를 `K=V K2=V2` 로.
 func (c *Context) EnvStr() string { return config.EnvString(c.RunEnv()) }
 
-// Remote 는 어댑터의 명령 템플릿을 채운다. repo_raw · branch · env 는 자동으로 들어간다.
+// SourceEnvKeys 는 소스 재기동에 넘기는 값이다 — 골든 응답의 전제(LLM temperature · seed)만.
+// CODE_SOURCE · COMPARE · FORM · VERIFY_ADMIN_PASSWORD 같은 타겟용 값은 소스에 넘기지 않는다: Shell 은 CODE_SOURCE=package 면
+// --rebuild 를 건너뛰고, Compose 는 COMPARE=1 이면 소스에서 이관 비교를 돌려 소스 결과표에 타겟 행을 남긴다.
+var SourceEnvKeys = []string{"LLM_TEMPERATURE", "LLM_SEED"}
+
+// SourceEnvStr 은 run.env 중 SourceEnvKeys 만 `K=V` 로 (파일 순서).
+func (c *Context) SourceEnvStr() string {
+	var env []config.KV
+	for _, kv := range c.Case.Env() {
+		for _, k := range SourceEnvKeys {
+			if kv.K == k {
+				env = append(env, kv)
+			}
+		}
+	}
+	return config.EnvString(env)
+}
+
+// Remote 는 어댑터의 명령 템플릿을 채운다. repo_raw · branch · env(타겟용) · source_env(소스용)는 자동으로 들어간다.
 func (c *Context) Remote(key string, values map[string]string) (string, error) {
-	base := map[string]string{"repo_raw": c.Adapter.S("repo_raw"), "branch": c.Adapter.S("branch"), "env": c.EnvStr()}
+	base := map[string]string{"repo_raw": c.Adapter.S("repo_raw"), "branch": c.Adapter.S("branch"), "env": c.EnvStr(),
+		"source_env": c.SourceEnvStr()}
 	for k, v := range values {
 		base[k] = v
 	}
