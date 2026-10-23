@@ -1,0 +1,4 @@
+# LexAI · Docker Compose(B) — 자리만.
+todo: "LexAI 인터페이스 정렬 뒤에 채운다"
+workload: lexai
+form: compose

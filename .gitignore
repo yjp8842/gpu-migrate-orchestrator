@@ -1,0 +1,9 @@
+settings.yaml
+evidence/
+*.pem
+/migrate
+/bin/
+.venv/
+__pycache__/
+*.pyc
+.env

@@ -1,0 +1,23 @@
+# 실행 환경 설정 — 그대로 쓰거나 settings.yaml 로 복사해 고친다 (settings.yaml 은 .gitignore).
+# 주소 · 계정 · 비밀번호는 파일에 쓰지 않고 환경변수로 받는다. ${이름} 은 꼭 있어야 하고, ${이름:-값} 은 없으면 값을 쓴다.
+# 환경변수는 셸에서 export 하거나 프로젝트 폴더의 .env 에 적는다 (.env 는 .gitignore, 견본은 .env.example).
+tumblebugs:
+  default:                       # 사례의 source.tumblebug / target.tumblebug 가 이 이름을 가리킨다
+    url: "${GMP_TB_URL}"         # 예: http://<서버>:1323/tumblebug
+    user: "${GMP_TB_USER}"
+    password: "${GMP_TB_PASSWORD}"
+beetle:                          # 패키지 이관이 Beetle 로만 가서 대부분의 사례에 필요하다 (비우면 preflight 에서 멈춘다)
+  url: "${GMP_BEETLE_URL:-}"     # 예: http://<서버>:8056/beetle — 8056 이 밖에서 막혀 있으면 Beetle UI 의 프록시 http://<서버>:3080/beetle
+  user: "${GMP_BEETLE_USER:-}"
+  password: "${GMP_BEETLE_PASSWORD:-}"
+evidence_root: "${GMP_EVIDENCE_ROOT:-evidence}"   # run 디렉토리(사례/run-id/)가 여기 생긴다. 상대 경로는 이 파일 기준
+timeouts:
+  provision_min: 30                    # 인프라 생성 요청(동기)
+  package_min: 120                     # 소스 backup 원격 명령 (Tumblebug 최대 120)
+  start_min: 75                        # 타겟 기동 → 검증까지 (드라이버 · 재부팅 · 모델 다운로드 · 골든 포함)
+  transfer_min: 60
+pacing:
+  infra_get_interval_sec: 1.0          # GET /ns/{ns}/infra[/{id}] 는 출발 IP 당 2 req/s — MapUI 사용자와 공유
+  default_interval_sec: 0.25
+  start_poll_sec: 60                   # 기동 확인 간격 — 확인마다 Tumblebug 원격 명령 기록이 하나씩 남는다
+  ready_poll_sec: 15                   # 생성 직후 원격 명령이 닿는지 확인하는 간격

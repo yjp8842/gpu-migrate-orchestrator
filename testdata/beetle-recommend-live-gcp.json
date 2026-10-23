@@ -1,0 +1,1724 @@
+{
+ "captured": "2026-10-22 Beetle UI proxy 3080, gcp asia-northeast3, source g4dn.xlarge T4",
+ "request": {
+  "desiredCspAndRegionPair": {
+   "csp": "gcp",
+   "region": "asia-northeast3"
+  },
+  "onpremiseInfraModel": {
+   "network": {
+    "ipv4Networks": {
+     "cidrBlocks": [
+      "10.2.80.73/20"
+     ],
+     "defaultGateways": [
+      {
+       "ip": "10.2.80.1",
+       "interfaceName": "ens5",
+       "machineId": "ec2-widgetrag-shell-aws"
+      }
+     ]
+    },
+    "ipv6Networks": {}
+   },
+   "nodes": [
+    {
+     "hostname": "ip-10-2-80-73",
+     "machineId": "ec2-widgetrag-shell-aws",
+     "role": "worker",
+     "cpu": {
+      "architecture": "x86_64",
+      "cpus": 4,
+      "cores": 2,
+      "threads": 2,
+      "model": "Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz"
+     },
+     "memory": {
+      "type": "DDR4",
+      "totalSize": 15,
+      "available": 11,
+      "used": 4
+     },
+     "rootDisk": {
+      "label": "/dev/root",
+      "type": "SSD",
+      "totalSize": 104,
+      "available": 74,
+      "used": 30
+     },
+     "interfaces": [
+      {
+       "name": "ens5",
+       "macAddress": "02:00:00:00:00:01",
+       "ipv4CidrBlocks": [
+        "10.2.80.73/20"
+       ],
+       "mtu": 9001,
+       "state": "up"
+      }
+     ],
+     "routingTable": [
+      {
+       "destination": "default",
+       "gateway": "10.2.80.1",
+       "interface": "ens5",
+       "metric": 100,
+       "protocol": "dhcp",
+       "scope": "",
+       "linkState": "up"
+      }
+     ],
+     "firewallTable": [
+      {
+       "srcCIDR": "0.0.0.0/0",
+       "srcPorts": "*",
+       "dstCIDR": "*",
+       "dstPorts": "22",
+       "protocol": "tcp",
+       "direction": "inbound",
+       "action": "allow"
+      },
+      {
+       "srcCIDR": "203.0.113.254/32",
+       "srcPorts": "*",
+       "dstCIDR": "*",
+       "dstPorts": "80",
+       "protocol": "tcp",
+       "direction": "inbound",
+       "action": "allow"
+      }
+     ],
+     "os": {
+      "prettyName": "Ubuntu 24.04.3 LTS",
+      "version": "24.04.3 LTS (Noble Numbat)",
+      "name": "Ubuntu",
+      "versionId": "24.04",
+      "versionCodename": "noble",
+      "id": "ubuntu",
+      "idLike": "debian"
+     },
+     "gpuCards": [
+      {
+       "driverIndex": "0",
+       "uuid": "GPU-00000000-0000-0000-0000-000000000000",
+       "vendor": "NVIDIA",
+       "model": "Tesla T4",
+       "type": "GPU",
+       "driverVersion": "595.99.02",
+       "cudaVersion": "13.2",
+       "pciBusId": "00000000:00:1E.0",
+       "memoryTotalGB": 16
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "data": [
+  {
+   "status": "partially-matched",
+   "description": "GPU Candidate #1 | partially-matched | Overall Match Rate: Min=50.0% Max=93.8% Avg=70.1% | VMs: 1 total, 0 matched, 1 acceptable",
+   "targetCloud": {
+    "csp": "gcp",
+    "region": "asia-northeast3"
+   },
+   "targetInfra": {
+    "name": "gpu-infra-01",
+    "installMonAgent": "",
+    "label": null,
+    "systemLabel": "",
+    "description": "",
+    "nodeGroups": [
+     {
+      "name": "vm-ec2-widgetrag-shell-aws",
+      "nodeGroupSize": 1,
+      "label": {
+       "cm-source-machine-ids": "ec2-widgetrag-shell-aws"
+      },
+      "description": "Recommended VM 01 for ec2-widgetrag-shell-aws",
+      "connectionName": "gcp-asia-northeast3",
+      "specId": "gcp+asia-northeast3+g2-standard-4",
+      "imageId": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "vNetId": "vnet-01",
+      "subnetId": "subnet-01",
+      "securityGroupIds": [
+       "sg-01"
+      ],
+      "sshKeyId": "sshkey-01",
+      "rootDiskSize": 104,
+      "dataDiskIds": null
+     }
+    ],
+    "policyOnPartialFailure": ""
+   },
+   "targetVNet": {
+    "name": "vnet-01",
+    "connectionName": "gcp-asia-northeast3",
+    "cidrBlock": "10.2.0.0/16",
+    "subnetInfoList": [
+     {
+      "name": "subnet-01",
+      "ipv4_CIDR": "10.2.80.0/20",
+      "description": "a recommended subnet for GPU migration"
+     }
+    ],
+    "description": "a recommended vNet for GPU workload migration"
+   },
+   "targetSshKey": {
+    "name": "sshkey-01",
+    "connectionName": "gcp-asia-northeast3",
+    "description": "SSH Key pair for GPU migration",
+    "cspResourceId": "",
+    "fingerprint": "",
+    "username": "",
+    "verifiedUsername": "",
+    "publicKey": "",
+    "privateKey": ""
+   },
+   "targetSpecList": [
+    {
+     "id": "gcp+asia-northeast3+g2-standard-4",
+     "uid": "tb7dc6c2ipmnufru6odt",
+     "cspSpecName": "g2-standard-4",
+     "name": "gcp+asia-northeast3+g2-standard-4",
+     "namespace": "system",
+     "connectionName": "gcp-asia-northeast3",
+     "providerName": "gcp",
+     "regionName": "asia-northeast3",
+     "regionLatitude": 37.2,
+     "regionLongitude": 127,
+     "infraType": "node",
+     "architecture": "x86_64",
+     "vCPU": 4,
+     "memoryGiB": 16,
+     "diskSizeGB": -1,
+     "acceleratorModel": "NVIDIA L4",
+     "acceleratorCount": 1,
+     "acceleratorMemoryGB": 24,
+     "acceleratorType": "gpu",
+     "costPerHour": 0.907714,
+     "evaluationScore01": -1,
+     "evaluationScore02": -1,
+     "evaluationScore03": -1,
+     "evaluationScore04": -1,
+     "evaluationScore05": -1,
+     "evaluationScore06": -1,
+     "evaluationScore07": -1,
+     "evaluationScore08": -1,
+     "evaluationScore09": -1,
+     "evaluationScore10": -1,
+     "rootDiskType": "",
+     "rootDiskSize": -1,
+     "systemLabel": "auto-gen",
+     "details": [
+      {
+       "key": "Accelerators",
+       "value": "{guestAcceleratorCount:1,guestAcceleratorType:nvidia-l4}"
+      },
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "1969-12-31T16:00:00.000-08:00"
+      },
+      {
+       "key": "Description",
+       "value": "Graphics Optimized: 1 NVIDIA L4 GPU, 4 vCPUs, 16GB RAM"
+      },
+      {
+       "key": "GuestCpus",
+       "value": "4"
+      },
+      {
+       "key": "Id",
+       "value": "1600004"
+      },
+      {
+       "key": "ImageSpaceGb",
+       "value": "0"
+      },
+      {
+       "key": "IsSharedCpu",
+       "value": "false"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#machineType"
+      },
+      {
+       "key": "MaximumPersistentDisks",
+       "value": "128"
+      },
+      {
+       "key": "MaximumPersistentDisksSizeGb",
+       "value": "263168"
+      },
+      {
+       "key": "MemoryMb",
+       "value": "16384"
+      },
+      {
+       "key": "Name",
+       "value": "g2-standard-4"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/example-gcp-project/zones/asia-northeast3-a/machineTypes/g2-standard-4"
+      },
+      {
+       "key": "Zone",
+       "value": "asia-northeast3-a"
+      }
+     ]
+    }
+   ],
+   "targetOsImageList": [
+    {
+     "resourceType": "image",
+     "namespace": "system",
+     "providerName": "gcp",
+     "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "regionList": [
+      "common"
+     ],
+     "id": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "uid": "tbh1pb02ts0adp88u93l",
+     "name": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "sourceNodeUid": "",
+     "sourceCspImageName": "",
+     "connectionName": "gcp-africa-south1",
+     "infraType": "",
+     "fetchedTime": "2026.10.06 03:33:12 Tue",
+     "creationDate": "",
+     "isGPUImage": true,
+     "isKubernetesImage": false,
+     "isBasicImage": false,
+     "isBasicGpuImage": true,
+     "osType": "Ubuntu 24.04",
+     "osArchitecture": "x86_64",
+     "osPlatform": "Linux/UNIX",
+     "osDistribution": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "osDiskType": "NA",
+     "osDiskSizeGB": 10,
+     "imageStatus": "Available",
+     "details": [
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "ArchiveSizeBytes",
+       "value": "87864646400"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "2026-09-25T05:16:54.080-07:00"
+      },
+      {
+       "key": "Description",
+       "value": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25"
+      },
+      {
+       "key": "DiskSizeGb",
+       "value": "10"
+      },
+      {
+       "key": "EnableConfidentialCompute",
+       "value": "false"
+      },
+      {
+       "key": "Family",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595"
+      },
+      {
+       "key": "GuestOsFeatures",
+       "value": "{type:VIRTIO_SCSI_MULTIQUEUE}; {type:SEV_CAPABLE}; {type:SEV_SNP_CAPABLE}; {type:SEV_LIVE_MIGRATABLE}; {type:SEV_LIVE_MIGRATABLE_V2}; {type:SNP_SVSM_CAPABLE}; {type:IDPF}; {type:TDX_CAPABLE}; {type:UEFI_COMPATIBLE}; {type:GVNIC}"
+      },
+      {
+       "key": "Id",
+       "value": "4736172453068003546"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#image"
+      },
+      {
+       "key": "LabelFingerprint",
+       "value": "iNBmVNCFF9w="
+      },
+      {
+       "key": "Labels",
+       "value": "{public-image:true}"
+      },
+      {
+       "key": "LicenseCodes",
+       "value": "3242930272766215801; 9199942628295552216; 627516972905829540"
+      },
+      {
+       "key": "Licenses",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/licenses/ubuntu-2404-lts; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/ubuntu-2404-lts-accelerated; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/nvidia-595"
+      },
+      {
+       "key": "Name",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "RawDisk",
+       "value": "{containerType:TAR}"
+      },
+      {
+       "key": "SatisfiesPzi",
+       "value": "false"
+      },
+      {
+       "key": "SatisfiesPzs",
+       "value": "false"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "SourceType",
+       "value": "RAW"
+      },
+      {
+       "key": "Status",
+       "value": "READY"
+      },
+      {
+       "key": "StorageLocations",
+       "value": "europe-west6; me-central2; africa-south1; europe-west4; us-west2; asia-northeast3; northamerica-northeast1; us-west8; asia-east2; europe-west3; us; eu; southamerica-west1; europe-southwest1; europe-west9; northamerica-northeast2; asia; asia-northeast2; asia-southeast2; us-east7; europe-west15; us-east5; us-central2; northamerica-south1; asia-east1; us-west1; australia-southeast2; us-south1; asia-south1; us-central1; asia-northeast1; europe-west8; us-west4; europe-west12; me-central1; us-west3; europe-west10; europe-north2; asia-south2; europe-west1; australia-southeast1; europe-west2; europe-central2; us-east1; asia-southeast1; us-east4; me-west1; southamerica-east1; asia-southeast3; europe-north1"
+      }
+     ],
+     "systemLabel": "",
+     "description": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "commandHistory": null
+    }
+   ],
+   "targetSecurityGroupList": [
+    {
+     "name": "sg-01",
+     "connectionName": "gcp-asia-northeast3",
+     "vNetId": "vnet-01",
+     "description": "Recommended security group for ec2-widgetrag-shell-aws",
+     "firewallRules": [
+      {
+       "Ports": "22",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "0.0.0.0/0"
+      },
+      {
+       "Ports": "80",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "203.0.113.254/32"
+      }
+     ],
+     "cspResourceId": ""
+    }
+   ],
+   "targetK8sCluster": {
+    "connectionName": "",
+    "description": "",
+    "name": "",
+    "version": "",
+    "vNetId": "",
+    "subnetIds": null,
+    "securityGroupIds": null,
+    "k8sNodeGroupList": null,
+    "cspResourceId": "",
+    "label": null,
+    "systemLabel": ""
+   }
+  },
+  {
+   "status": "partially-matched",
+   "description": "GPU Candidate #2 | partially-matched | Overall Match Rate: Min=46.9% Max=100.0% Avg=71.2% | VMs: 1 total, 0 matched, 1 acceptable",
+   "targetCloud": {
+    "csp": "gcp",
+    "region": "asia-northeast3"
+   },
+   "targetInfra": {
+    "name": "gpu-infra-01",
+    "installMonAgent": "",
+    "label": null,
+    "systemLabel": "",
+    "description": "",
+    "nodeGroups": [
+     {
+      "name": "vm-ec2-widgetrag-shell-aws",
+      "nodeGroupSize": 1,
+      "label": {
+       "cm-source-machine-ids": "ec2-widgetrag-shell-aws"
+      },
+      "description": "Recommended VM 01 for ec2-widgetrag-shell-aws",
+      "connectionName": "gcp-asia-northeast3",
+      "specId": "gcp+asia-northeast3+g2-standard-8",
+      "imageId": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "vNetId": "vnet-01",
+      "subnetId": "subnet-01",
+      "securityGroupIds": [
+       "sg-01"
+      ],
+      "sshKeyId": "sshkey-01",
+      "rootDiskSize": 104,
+      "dataDiskIds": null
+     }
+    ],
+    "policyOnPartialFailure": ""
+   },
+   "targetVNet": {
+    "name": "vnet-01",
+    "connectionName": "gcp-asia-northeast3",
+    "cidrBlock": "10.2.0.0/16",
+    "subnetInfoList": [
+     {
+      "name": "subnet-01",
+      "ipv4_CIDR": "10.2.80.0/20",
+      "description": "a recommended subnet for GPU migration"
+     }
+    ],
+    "description": "a recommended vNet for GPU workload migration"
+   },
+   "targetSshKey": {
+    "name": "sshkey-01",
+    "connectionName": "gcp-asia-northeast3",
+    "description": "SSH Key pair for GPU migration",
+    "cspResourceId": "",
+    "fingerprint": "",
+    "username": "",
+    "verifiedUsername": "",
+    "publicKey": "",
+    "privateKey": ""
+   },
+   "targetSpecList": [
+    {
+     "id": "gcp+asia-northeast3+g2-standard-8",
+     "uid": "tba91asr9e6bjm8dpmqc",
+     "cspSpecName": "g2-standard-8",
+     "name": "gcp+asia-northeast3+g2-standard-8",
+     "namespace": "system",
+     "connectionName": "gcp-asia-northeast3",
+     "providerName": "gcp",
+     "regionName": "asia-northeast3",
+     "regionLatitude": 37.2,
+     "regionLongitude": 127,
+     "infraType": "node",
+     "architecture": "x86_64",
+     "vCPU": 8,
+     "memoryGiB": 32,
+     "diskSizeGB": -1,
+     "acceleratorModel": "NVIDIA L4",
+     "acceleratorCount": 1,
+     "acceleratorMemoryGB": 24,
+     "acceleratorType": "gpu",
+     "costPerHour": 1.096224,
+     "evaluationScore01": -1,
+     "evaluationScore02": -1,
+     "evaluationScore03": -1,
+     "evaluationScore04": -1,
+     "evaluationScore05": -1,
+     "evaluationScore06": -1,
+     "evaluationScore07": -1,
+     "evaluationScore08": -1,
+     "evaluationScore09": -1,
+     "evaluationScore10": -1,
+     "rootDiskType": "",
+     "rootDiskSize": -1,
+     "systemLabel": "auto-gen",
+     "details": [
+      {
+       "key": "Accelerators",
+       "value": "{guestAcceleratorCount:1,guestAcceleratorType:nvidia-l4}"
+      },
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "1969-12-31T16:00:00.000-08:00"
+      },
+      {
+       "key": "Description",
+       "value": "Graphics Optimized: 1 NVIDIA L4 GPU, 8 vCPUs, 32GB RAM"
+      },
+      {
+       "key": "GuestCpus",
+       "value": "8"
+      },
+      {
+       "key": "Id",
+       "value": "1600008"
+      },
+      {
+       "key": "ImageSpaceGb",
+       "value": "0"
+      },
+      {
+       "key": "IsSharedCpu",
+       "value": "false"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#machineType"
+      },
+      {
+       "key": "MaximumPersistentDisks",
+       "value": "128"
+      },
+      {
+       "key": "MaximumPersistentDisksSizeGb",
+       "value": "263168"
+      },
+      {
+       "key": "MemoryMb",
+       "value": "32768"
+      },
+      {
+       "key": "Name",
+       "value": "g2-standard-8"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/example-gcp-project/zones/asia-northeast3-a/machineTypes/g2-standard-8"
+      },
+      {
+       "key": "Zone",
+       "value": "asia-northeast3-a"
+      }
+     ]
+    }
+   ],
+   "targetOsImageList": [
+    {
+     "resourceType": "image",
+     "namespace": "system",
+     "providerName": "gcp",
+     "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "regionList": [
+      "common"
+     ],
+     "id": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "uid": "tbh1pb02ts0adp88u93l",
+     "name": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "sourceNodeUid": "",
+     "sourceCspImageName": "",
+     "connectionName": "gcp-africa-south1",
+     "infraType": "",
+     "fetchedTime": "2026.10.06 03:33:12 Tue",
+     "creationDate": "",
+     "isGPUImage": true,
+     "isKubernetesImage": false,
+     "isBasicImage": false,
+     "isBasicGpuImage": true,
+     "osType": "Ubuntu 24.04",
+     "osArchitecture": "x86_64",
+     "osPlatform": "Linux/UNIX",
+     "osDistribution": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "osDiskType": "NA",
+     "osDiskSizeGB": 10,
+     "imageStatus": "Available",
+     "details": [
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "ArchiveSizeBytes",
+       "value": "87864646400"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "2026-09-25T05:16:54.080-07:00"
+      },
+      {
+       "key": "Description",
+       "value": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25"
+      },
+      {
+       "key": "DiskSizeGb",
+       "value": "10"
+      },
+      {
+       "key": "EnableConfidentialCompute",
+       "value": "false"
+      },
+      {
+       "key": "Family",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595"
+      },
+      {
+       "key": "GuestOsFeatures",
+       "value": "{type:VIRTIO_SCSI_MULTIQUEUE}; {type:SEV_CAPABLE}; {type:SEV_SNP_CAPABLE}; {type:SEV_LIVE_MIGRATABLE}; {type:SEV_LIVE_MIGRATABLE_V2}; {type:SNP_SVSM_CAPABLE}; {type:IDPF}; {type:TDX_CAPABLE}; {type:UEFI_COMPATIBLE}; {type:GVNIC}"
+      },
+      {
+       "key": "Id",
+       "value": "4736172453068003546"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#image"
+      },
+      {
+       "key": "LabelFingerprint",
+       "value": "iNBmVNCFF9w="
+      },
+      {
+       "key": "Labels",
+       "value": "{public-image:true}"
+      },
+      {
+       "key": "LicenseCodes",
+       "value": "3242930272766215801; 9199942628295552216; 627516972905829540"
+      },
+      {
+       "key": "Licenses",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/licenses/ubuntu-2404-lts; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/ubuntu-2404-lts-accelerated; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/nvidia-595"
+      },
+      {
+       "key": "Name",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "RawDisk",
+       "value": "{containerType:TAR}"
+      },
+      {
+       "key": "SatisfiesPzi",
+       "value": "false"
+      },
+      {
+       "key": "SatisfiesPzs",
+       "value": "false"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "SourceType",
+       "value": "RAW"
+      },
+      {
+       "key": "Status",
+       "value": "READY"
+      },
+      {
+       "key": "StorageLocations",
+       "value": "europe-west6; me-central2; africa-south1; europe-west4; us-west2; asia-northeast3; northamerica-northeast1; us-west8; asia-east2; europe-west3; us; eu; southamerica-west1; europe-southwest1; europe-west9; northamerica-northeast2; asia; asia-northeast2; asia-southeast2; us-east7; europe-west15; us-east5; us-central2; northamerica-south1; asia-east1; us-west1; australia-southeast2; us-south1; asia-south1; us-central1; asia-northeast1; europe-west8; us-west4; europe-west12; me-central1; us-west3; europe-west10; europe-north2; asia-south2; europe-west1; australia-southeast1; europe-west2; europe-central2; us-east1; asia-southeast1; us-east4; me-west1; southamerica-east1; asia-southeast3; europe-north1"
+      }
+     ],
+     "systemLabel": "",
+     "description": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "commandHistory": null
+    }
+   ],
+   "targetSecurityGroupList": [
+    {
+     "name": "sg-01",
+     "connectionName": "gcp-asia-northeast3",
+     "vNetId": "vnet-01",
+     "description": "Recommended security group for ec2-widgetrag-shell-aws",
+     "firewallRules": [
+      {
+       "Ports": "22",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "0.0.0.0/0"
+      },
+      {
+       "Ports": "80",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "203.0.113.254/32"
+      }
+     ],
+     "cspResourceId": ""
+    }
+   ],
+   "targetK8sCluster": {
+    "connectionName": "",
+    "description": "",
+    "name": "",
+    "version": "",
+    "vNetId": "",
+    "subnetIds": null,
+    "securityGroupIds": null,
+    "k8sNodeGroupList": null,
+    "cspResourceId": "",
+    "label": null,
+    "systemLabel": ""
+   }
+  },
+  {
+   "status": "partially-matched",
+   "description": "GPU Candidate #3 | partially-matched | Overall Match Rate: Min=31.2% Max=66.7% Avg=54.9% | VMs: 1 total, 0 matched, 1 acceptable",
+   "targetCloud": {
+    "csp": "gcp",
+    "region": "asia-northeast3"
+   },
+   "targetInfra": {
+    "name": "gpu-infra-01",
+    "installMonAgent": "",
+    "label": null,
+    "systemLabel": "",
+    "description": "",
+    "nodeGroups": [
+     {
+      "name": "vm-ec2-widgetrag-shell-aws",
+      "nodeGroupSize": 1,
+      "label": {
+       "cm-source-machine-ids": "ec2-widgetrag-shell-aws"
+      },
+      "description": "Recommended VM 01 for ec2-widgetrag-shell-aws",
+      "connectionName": "gcp-asia-northeast3",
+      "specId": "gcp+asia-northeast3+g2-standard-12",
+      "imageId": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "vNetId": "vnet-01",
+      "subnetId": "subnet-01",
+      "securityGroupIds": [
+       "sg-01"
+      ],
+      "sshKeyId": "sshkey-01",
+      "rootDiskSize": 104,
+      "dataDiskIds": null
+     }
+    ],
+    "policyOnPartialFailure": ""
+   },
+   "targetVNet": {
+    "name": "vnet-01",
+    "connectionName": "gcp-asia-northeast3",
+    "cidrBlock": "10.2.0.0/16",
+    "subnetInfoList": [
+     {
+      "name": "subnet-01",
+      "ipv4_CIDR": "10.2.80.0/20",
+      "description": "a recommended subnet for GPU migration"
+     }
+    ],
+    "description": "a recommended vNet for GPU workload migration"
+   },
+   "targetSshKey": {
+    "name": "sshkey-01",
+    "connectionName": "gcp-asia-northeast3",
+    "description": "SSH Key pair for GPU migration",
+    "cspResourceId": "",
+    "fingerprint": "",
+    "username": "",
+    "verifiedUsername": "",
+    "publicKey": "",
+    "privateKey": ""
+   },
+   "targetSpecList": [
+    {
+     "id": "gcp+asia-northeast3+g2-standard-12",
+     "uid": "tbcrtmi579sjssqj0u2f",
+     "cspSpecName": "g2-standard-12",
+     "name": "gcp+asia-northeast3+g2-standard-12",
+     "namespace": "system",
+     "connectionName": "gcp-asia-northeast3",
+     "providerName": "gcp",
+     "regionName": "asia-northeast3",
+     "regionLatitude": 37.2,
+     "regionLongitude": 127,
+     "infraType": "node",
+     "architecture": "x86_64",
+     "vCPU": 12,
+     "memoryGiB": 48,
+     "diskSizeGB": -1,
+     "acceleratorModel": "NVIDIA L4",
+     "acceleratorCount": 1,
+     "acceleratorMemoryGB": 24,
+     "acceleratorType": "gpu",
+     "costPerHour": 1.284735,
+     "evaluationScore01": -1,
+     "evaluationScore02": -1,
+     "evaluationScore03": -1,
+     "evaluationScore04": -1,
+     "evaluationScore05": -1,
+     "evaluationScore06": -1,
+     "evaluationScore07": -1,
+     "evaluationScore08": -1,
+     "evaluationScore09": -1,
+     "evaluationScore10": -1,
+     "rootDiskType": "",
+     "rootDiskSize": -1,
+     "systemLabel": "auto-gen",
+     "details": [
+      {
+       "key": "Accelerators",
+       "value": "{guestAcceleratorCount:1,guestAcceleratorType:nvidia-l4}"
+      },
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "1969-12-31T16:00:00.000-08:00"
+      },
+      {
+       "key": "Description",
+       "value": "Graphics Optimized: 1 NVIDIA L4 GPU, 12 vCPUs, 48GB RAM"
+      },
+      {
+       "key": "GuestCpus",
+       "value": "12"
+      },
+      {
+       "key": "Id",
+       "value": "1600012"
+      },
+      {
+       "key": "ImageSpaceGb",
+       "value": "0"
+      },
+      {
+       "key": "IsSharedCpu",
+       "value": "false"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#machineType"
+      },
+      {
+       "key": "MaximumPersistentDisks",
+       "value": "128"
+      },
+      {
+       "key": "MaximumPersistentDisksSizeGb",
+       "value": "263168"
+      },
+      {
+       "key": "MemoryMb",
+       "value": "49152"
+      },
+      {
+       "key": "Name",
+       "value": "g2-standard-12"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/example-gcp-project/zones/asia-northeast3-a/machineTypes/g2-standard-12"
+      },
+      {
+       "key": "Zone",
+       "value": "asia-northeast3-a"
+      }
+     ]
+    }
+   ],
+   "targetOsImageList": [
+    {
+     "resourceType": "image",
+     "namespace": "system",
+     "providerName": "gcp",
+     "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "regionList": [
+      "common"
+     ],
+     "id": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "uid": "tbh1pb02ts0adp88u93l",
+     "name": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "sourceNodeUid": "",
+     "sourceCspImageName": "",
+     "connectionName": "gcp-africa-south1",
+     "infraType": "",
+     "fetchedTime": "2026.10.06 03:33:12 Tue",
+     "creationDate": "",
+     "isGPUImage": true,
+     "isKubernetesImage": false,
+     "isBasicImage": false,
+     "isBasicGpuImage": true,
+     "osType": "Ubuntu 24.04",
+     "osArchitecture": "x86_64",
+     "osPlatform": "Linux/UNIX",
+     "osDistribution": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "osDiskType": "NA",
+     "osDiskSizeGB": 10,
+     "imageStatus": "Available",
+     "details": [
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "ArchiveSizeBytes",
+       "value": "87864646400"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "2026-09-25T05:16:54.080-07:00"
+      },
+      {
+       "key": "Description",
+       "value": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25"
+      },
+      {
+       "key": "DiskSizeGb",
+       "value": "10"
+      },
+      {
+       "key": "EnableConfidentialCompute",
+       "value": "false"
+      },
+      {
+       "key": "Family",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595"
+      },
+      {
+       "key": "GuestOsFeatures",
+       "value": "{type:VIRTIO_SCSI_MULTIQUEUE}; {type:SEV_CAPABLE}; {type:SEV_SNP_CAPABLE}; {type:SEV_LIVE_MIGRATABLE}; {type:SEV_LIVE_MIGRATABLE_V2}; {type:SNP_SVSM_CAPABLE}; {type:IDPF}; {type:TDX_CAPABLE}; {type:UEFI_COMPATIBLE}; {type:GVNIC}"
+      },
+      {
+       "key": "Id",
+       "value": "4736172453068003546"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#image"
+      },
+      {
+       "key": "LabelFingerprint",
+       "value": "iNBmVNCFF9w="
+      },
+      {
+       "key": "Labels",
+       "value": "{public-image:true}"
+      },
+      {
+       "key": "LicenseCodes",
+       "value": "3242930272766215801; 9199942628295552216; 627516972905829540"
+      },
+      {
+       "key": "Licenses",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/licenses/ubuntu-2404-lts; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/ubuntu-2404-lts-accelerated; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/nvidia-595"
+      },
+      {
+       "key": "Name",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "RawDisk",
+       "value": "{containerType:TAR}"
+      },
+      {
+       "key": "SatisfiesPzi",
+       "value": "false"
+      },
+      {
+       "key": "SatisfiesPzs",
+       "value": "false"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "SourceType",
+       "value": "RAW"
+      },
+      {
+       "key": "Status",
+       "value": "READY"
+      },
+      {
+       "key": "StorageLocations",
+       "value": "europe-west6; me-central2; africa-south1; europe-west4; us-west2; asia-northeast3; northamerica-northeast1; us-west8; asia-east2; europe-west3; us; eu; southamerica-west1; europe-southwest1; europe-west9; northamerica-northeast2; asia; asia-northeast2; asia-southeast2; us-east7; europe-west15; us-east5; us-central2; northamerica-south1; asia-east1; us-west1; australia-southeast2; us-south1; asia-south1; us-central1; asia-northeast1; europe-west8; us-west4; europe-west12; me-central1; us-west3; europe-west10; europe-north2; asia-south2; europe-west1; australia-southeast1; europe-west2; europe-central2; us-east1; asia-southeast1; us-east4; me-west1; southamerica-east1; asia-southeast3; europe-north1"
+      }
+     ],
+     "systemLabel": "",
+     "description": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "commandHistory": null
+    }
+   ],
+   "targetSecurityGroupList": [
+    {
+     "name": "sg-01",
+     "connectionName": "gcp-asia-northeast3",
+     "vNetId": "vnet-01",
+     "description": "Recommended security group for ec2-widgetrag-shell-aws",
+     "firewallRules": [
+      {
+       "Ports": "22",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "0.0.0.0/0"
+      },
+      {
+       "Ports": "80",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "203.0.113.254/32"
+      }
+     ],
+     "cspResourceId": ""
+    }
+   ],
+   "targetK8sCluster": {
+    "connectionName": "",
+    "description": "",
+    "name": "",
+    "version": "",
+    "vNetId": "",
+    "subnetIds": null,
+    "securityGroupIds": null,
+    "k8sNodeGroupList": null,
+    "cspResourceId": "",
+    "label": null,
+    "systemLabel": ""
+   }
+  },
+  {
+   "status": "partially-matched",
+   "description": "GPU Candidate #4 | partially-matched | Overall Match Rate: Min=23.4% Max=66.7% Avg=46.7% | VMs: 1 total, 0 matched, 1 acceptable",
+   "targetCloud": {
+    "csp": "gcp",
+    "region": "asia-northeast3"
+   },
+   "targetInfra": {
+    "name": "gpu-infra-01",
+    "installMonAgent": "",
+    "label": null,
+    "systemLabel": "",
+    "description": "",
+    "nodeGroups": [
+     {
+      "name": "vm-ec2-widgetrag-shell-aws",
+      "nodeGroupSize": 1,
+      "label": {
+       "cm-source-machine-ids": "ec2-widgetrag-shell-aws"
+      },
+      "description": "Recommended VM 01 for ec2-widgetrag-shell-aws",
+      "connectionName": "gcp-asia-northeast3",
+      "specId": "gcp+asia-northeast3+g2-standard-16",
+      "imageId": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "vNetId": "vnet-01",
+      "subnetId": "subnet-01",
+      "securityGroupIds": [
+       "sg-01"
+      ],
+      "sshKeyId": "sshkey-01",
+      "rootDiskSize": 104,
+      "dataDiskIds": null
+     }
+    ],
+    "policyOnPartialFailure": ""
+   },
+   "targetVNet": {
+    "name": "vnet-01",
+    "connectionName": "gcp-asia-northeast3",
+    "cidrBlock": "10.2.0.0/16",
+    "subnetInfoList": [
+     {
+      "name": "subnet-01",
+      "ipv4_CIDR": "10.2.80.0/20",
+      "description": "a recommended subnet for GPU migration"
+     }
+    ],
+    "description": "a recommended vNet for GPU workload migration"
+   },
+   "targetSshKey": {
+    "name": "sshkey-01",
+    "connectionName": "gcp-asia-northeast3",
+    "description": "SSH Key pair for GPU migration",
+    "cspResourceId": "",
+    "fingerprint": "",
+    "username": "",
+    "verifiedUsername": "",
+    "publicKey": "",
+    "privateKey": ""
+   },
+   "targetSpecList": [
+    {
+     "id": "gcp+asia-northeast3+g2-standard-16",
+     "uid": "tbdm8gp8747nhtltoca1",
+     "cspSpecName": "g2-standard-16",
+     "name": "gcp+asia-northeast3+g2-standard-16",
+     "namespace": "system",
+     "connectionName": "gcp-asia-northeast3",
+     "providerName": "gcp",
+     "regionName": "asia-northeast3",
+     "regionLatitude": 37.2,
+     "regionLongitude": 127,
+     "infraType": "node",
+     "architecture": "x86_64",
+     "vCPU": 16,
+     "memoryGiB": 64,
+     "diskSizeGB": -1,
+     "acceleratorModel": "NVIDIA L4",
+     "acceleratorCount": 1,
+     "acceleratorMemoryGB": 24,
+     "acceleratorType": "gpu",
+     "costPerHour": 1.473245,
+     "evaluationScore01": -1,
+     "evaluationScore02": -1,
+     "evaluationScore03": -1,
+     "evaluationScore04": -1,
+     "evaluationScore05": -1,
+     "evaluationScore06": -1,
+     "evaluationScore07": -1,
+     "evaluationScore08": -1,
+     "evaluationScore09": -1,
+     "evaluationScore10": -1,
+     "rootDiskType": "",
+     "rootDiskSize": -1,
+     "systemLabel": "auto-gen",
+     "details": [
+      {
+       "key": "Accelerators",
+       "value": "{guestAcceleratorCount:1,guestAcceleratorType:nvidia-l4}"
+      },
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "1969-12-31T16:00:00.000-08:00"
+      },
+      {
+       "key": "Description",
+       "value": "Graphics Optimized: 1 NVIDIA L4 GPU, 16 vCPUs, 64GB RAM"
+      },
+      {
+       "key": "GuestCpus",
+       "value": "16"
+      },
+      {
+       "key": "Id",
+       "value": "1600016"
+      },
+      {
+       "key": "ImageSpaceGb",
+       "value": "0"
+      },
+      {
+       "key": "IsSharedCpu",
+       "value": "false"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#machineType"
+      },
+      {
+       "key": "MaximumPersistentDisks",
+       "value": "128"
+      },
+      {
+       "key": "MaximumPersistentDisksSizeGb",
+       "value": "263168"
+      },
+      {
+       "key": "MemoryMb",
+       "value": "65536"
+      },
+      {
+       "key": "Name",
+       "value": "g2-standard-16"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/example-gcp-project/zones/asia-northeast3-a/machineTypes/g2-standard-16"
+      },
+      {
+       "key": "Zone",
+       "value": "asia-northeast3-a"
+      }
+     ]
+    }
+   ],
+   "targetOsImageList": [
+    {
+     "resourceType": "image",
+     "namespace": "system",
+     "providerName": "gcp",
+     "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "regionList": [
+      "common"
+     ],
+     "id": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "uid": "tbh1pb02ts0adp88u93l",
+     "name": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "sourceNodeUid": "",
+     "sourceCspImageName": "",
+     "connectionName": "gcp-africa-south1",
+     "infraType": "",
+     "fetchedTime": "2026.10.06 03:33:12 Tue",
+     "creationDate": "",
+     "isGPUImage": true,
+     "isKubernetesImage": false,
+     "isBasicImage": false,
+     "isBasicGpuImage": true,
+     "osType": "Ubuntu 24.04",
+     "osArchitecture": "x86_64",
+     "osPlatform": "Linux/UNIX",
+     "osDistribution": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "osDiskType": "NA",
+     "osDiskSizeGB": 10,
+     "imageStatus": "Available",
+     "details": [
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "ArchiveSizeBytes",
+       "value": "87864646400"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "2026-09-25T05:16:54.080-07:00"
+      },
+      {
+       "key": "Description",
+       "value": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25"
+      },
+      {
+       "key": "DiskSizeGb",
+       "value": "10"
+      },
+      {
+       "key": "EnableConfidentialCompute",
+       "value": "false"
+      },
+      {
+       "key": "Family",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595"
+      },
+      {
+       "key": "GuestOsFeatures",
+       "value": "{type:VIRTIO_SCSI_MULTIQUEUE}; {type:SEV_CAPABLE}; {type:SEV_SNP_CAPABLE}; {type:SEV_LIVE_MIGRATABLE}; {type:SEV_LIVE_MIGRATABLE_V2}; {type:SNP_SVSM_CAPABLE}; {type:IDPF}; {type:TDX_CAPABLE}; {type:UEFI_COMPATIBLE}; {type:GVNIC}"
+      },
+      {
+       "key": "Id",
+       "value": "4736172453068003546"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#image"
+      },
+      {
+       "key": "LabelFingerprint",
+       "value": "iNBmVNCFF9w="
+      },
+      {
+       "key": "Labels",
+       "value": "{public-image:true}"
+      },
+      {
+       "key": "LicenseCodes",
+       "value": "3242930272766215801; 9199942628295552216; 627516972905829540"
+      },
+      {
+       "key": "Licenses",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/licenses/ubuntu-2404-lts; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/ubuntu-2404-lts-accelerated; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/nvidia-595"
+      },
+      {
+       "key": "Name",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "RawDisk",
+       "value": "{containerType:TAR}"
+      },
+      {
+       "key": "SatisfiesPzi",
+       "value": "false"
+      },
+      {
+       "key": "SatisfiesPzs",
+       "value": "false"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "SourceType",
+       "value": "RAW"
+      },
+      {
+       "key": "Status",
+       "value": "READY"
+      },
+      {
+       "key": "StorageLocations",
+       "value": "europe-west6; me-central2; africa-south1; europe-west4; us-west2; asia-northeast3; northamerica-northeast1; us-west8; asia-east2; europe-west3; us; eu; southamerica-west1; europe-southwest1; europe-west9; northamerica-northeast2; asia; asia-northeast2; asia-southeast2; us-east7; europe-west15; us-east5; us-central2; northamerica-south1; asia-east1; us-west1; australia-southeast2; us-south1; asia-south1; us-central1; asia-northeast1; europe-west8; us-west4; europe-west12; me-central1; us-west3; europe-west10; europe-north2; asia-south2; europe-west1; australia-southeast1; europe-west2; europe-central2; us-east1; asia-southeast1; us-east4; me-west1; southamerica-east1; asia-southeast3; europe-north1"
+      }
+     ],
+     "systemLabel": "",
+     "description": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "commandHistory": null
+    }
+   ],
+   "targetSecurityGroupList": [
+    {
+     "name": "sg-01",
+     "connectionName": "gcp-asia-northeast3",
+     "vNetId": "vnet-01",
+     "description": "Recommended security group for ec2-widgetrag-shell-aws",
+     "firewallRules": [
+      {
+       "Ports": "22",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "0.0.0.0/0"
+      },
+      {
+       "Ports": "80",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "203.0.113.254/32"
+      }
+     ],
+     "cspResourceId": ""
+    }
+   ],
+   "targetK8sCluster": {
+    "connectionName": "",
+    "description": "",
+    "name": "",
+    "version": "",
+    "vNetId": "",
+    "subnetIds": null,
+    "securityGroupIds": null,
+    "k8sNodeGroupList": null,
+    "cspResourceId": "",
+    "label": null,
+    "systemLabel": ""
+   }
+  },
+  {
+   "status": "partially-matched",
+   "description": "GPU Candidate #5 | partially-matched | Overall Match Rate: Min=11.7% Max=66.7% Avg=34.5% | VMs: 1 total, 0 matched, 1 acceptable",
+   "targetCloud": {
+    "csp": "gcp",
+    "region": "asia-northeast3"
+   },
+   "targetInfra": {
+    "name": "gpu-infra-01",
+    "installMonAgent": "",
+    "label": null,
+    "systemLabel": "",
+    "description": "",
+    "nodeGroups": [
+     {
+      "name": "vm-ec2-widgetrag-shell-aws",
+      "nodeGroupSize": 1,
+      "label": {
+       "cm-source-machine-ids": "ec2-widgetrag-shell-aws"
+      },
+      "description": "Recommended VM 01 for ec2-widgetrag-shell-aws",
+      "connectionName": "gcp-asia-northeast3",
+      "specId": "gcp+asia-northeast3+g2-standard-32",
+      "imageId": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+      "vNetId": "vnet-01",
+      "subnetId": "subnet-01",
+      "securityGroupIds": [
+       "sg-01"
+      ],
+      "sshKeyId": "sshkey-01",
+      "rootDiskSize": 104,
+      "dataDiskIds": null
+     }
+    ],
+    "policyOnPartialFailure": ""
+   },
+   "targetVNet": {
+    "name": "vnet-01",
+    "connectionName": "gcp-asia-northeast3",
+    "cidrBlock": "10.2.0.0/16",
+    "subnetInfoList": [
+     {
+      "name": "subnet-01",
+      "ipv4_CIDR": "10.2.80.0/20",
+      "description": "a recommended subnet for GPU migration"
+     }
+    ],
+    "description": "a recommended vNet for GPU workload migration"
+   },
+   "targetSshKey": {
+    "name": "sshkey-01",
+    "connectionName": "gcp-asia-northeast3",
+    "description": "SSH Key pair for GPU migration",
+    "cspResourceId": "",
+    "fingerprint": "",
+    "username": "",
+    "verifiedUsername": "",
+    "publicKey": "",
+    "privateKey": ""
+   },
+   "targetSpecList": [
+    {
+     "id": "gcp+asia-northeast3+g2-standard-32",
+     "uid": "tbqokj88580448l1usog",
+     "cspSpecName": "g2-standard-32",
+     "name": "gcp+asia-northeast3+g2-standard-32",
+     "namespace": "system",
+     "connectionName": "gcp-asia-northeast3",
+     "providerName": "gcp",
+     "regionName": "asia-northeast3",
+     "regionLatitude": 37.2,
+     "regionLongitude": 127,
+     "infraType": "node",
+     "architecture": "x86_64",
+     "vCPU": 32,
+     "memoryGiB": 128,
+     "diskSizeGB": -1,
+     "acceleratorModel": "NVIDIA L4",
+     "acceleratorCount": 1,
+     "acceleratorMemoryGB": 24,
+     "acceleratorType": "gpu",
+     "costPerHour": 2.227286,
+     "evaluationScore01": -1,
+     "evaluationScore02": -1,
+     "evaluationScore03": -1,
+     "evaluationScore04": -1,
+     "evaluationScore05": -1,
+     "evaluationScore06": -1,
+     "evaluationScore07": -1,
+     "evaluationScore08": -1,
+     "evaluationScore09": -1,
+     "evaluationScore10": -1,
+     "rootDiskType": "",
+     "rootDiskSize": -1,
+     "systemLabel": "auto-gen",
+     "details": [
+      {
+       "key": "Accelerators",
+       "value": "{guestAcceleratorCount:1,guestAcceleratorType:nvidia-l4}"
+      },
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "1969-12-31T16:00:00.000-08:00"
+      },
+      {
+       "key": "Description",
+       "value": "Graphics Optimized: 1 NVIDIA L4 GPU, 32 vCPUs, 128GB RAM"
+      },
+      {
+       "key": "GuestCpus",
+       "value": "32"
+      },
+      {
+       "key": "Id",
+       "value": "1600032"
+      },
+      {
+       "key": "ImageSpaceGb",
+       "value": "0"
+      },
+      {
+       "key": "IsSharedCpu",
+       "value": "false"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#machineType"
+      },
+      {
+       "key": "MaximumPersistentDisks",
+       "value": "128"
+      },
+      {
+       "key": "MaximumPersistentDisksSizeGb",
+       "value": "524288"
+      },
+      {
+       "key": "MemoryMb",
+       "value": "131072"
+      },
+      {
+       "key": "Name",
+       "value": "g2-standard-32"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/example-gcp-project/zones/asia-northeast3-a/machineTypes/g2-standard-32"
+      },
+      {
+       "key": "Zone",
+       "value": "asia-northeast3-a"
+      }
+     ]
+    }
+   ],
+   "targetOsImageList": [
+    {
+     "resourceType": "image",
+     "namespace": "system",
+     "providerName": "gcp",
+     "cspImageName": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "regionList": [
+      "common"
+     ],
+     "id": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "uid": "tbh1pb02ts0adp88u93l",
+     "name": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925",
+     "sourceNodeUid": "",
+     "sourceCspImageName": "",
+     "connectionName": "gcp-africa-south1",
+     "infraType": "",
+     "fetchedTime": "2026.10.06 03:33:12 Tue",
+     "creationDate": "",
+     "isGPUImage": true,
+     "isKubernetesImage": false,
+     "isBasicImage": false,
+     "isBasicGpuImage": true,
+     "osType": "Ubuntu 24.04",
+     "osArchitecture": "x86_64",
+     "osPlatform": "Linux/UNIX",
+     "osDistribution": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "osDiskType": "NA",
+     "osDiskSizeGB": 10,
+     "imageStatus": "Available",
+     "details": [
+      {
+       "key": "Architecture",
+       "value": "X86_64"
+      },
+      {
+       "key": "ArchiveSizeBytes",
+       "value": "87864646400"
+      },
+      {
+       "key": "CreationTimestamp",
+       "value": "2026-09-25T05:16:54.080-07:00"
+      },
+      {
+       "key": "Description",
+       "value": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25"
+      },
+      {
+       "key": "DiskSizeGb",
+       "value": "10"
+      },
+      {
+       "key": "EnableConfidentialCompute",
+       "value": "false"
+      },
+      {
+       "key": "Family",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595"
+      },
+      {
+       "key": "GuestOsFeatures",
+       "value": "{type:VIRTIO_SCSI_MULTIQUEUE}; {type:SEV_CAPABLE}; {type:SEV_SNP_CAPABLE}; {type:SEV_LIVE_MIGRATABLE}; {type:SEV_LIVE_MIGRATABLE_V2}; {type:SNP_SVSM_CAPABLE}; {type:IDPF}; {type:TDX_CAPABLE}; {type:UEFI_COMPATIBLE}; {type:GVNIC}"
+      },
+      {
+       "key": "Id",
+       "value": "4736172453068003546"
+      },
+      {
+       "key": "Kind",
+       "value": "compute#image"
+      },
+      {
+       "key": "LabelFingerprint",
+       "value": "iNBmVNCFF9w="
+      },
+      {
+       "key": "Labels",
+       "value": "{public-image:true}"
+      },
+      {
+       "key": "LicenseCodes",
+       "value": "3242930272766215801; 9199942628295552216; 627516972905829540"
+      },
+      {
+       "key": "Licenses",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/licenses/ubuntu-2404-lts; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/ubuntu-2404-lts-accelerated; https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/licenses/nvidia-595"
+      },
+      {
+       "key": "Name",
+       "value": "ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "RawDisk",
+       "value": "{containerType:TAR}"
+      },
+      {
+       "key": "SatisfiesPzi",
+       "value": "false"
+      },
+      {
+       "key": "SatisfiesPzs",
+       "value": "false"
+      },
+      {
+       "key": "SelfLink",
+       "value": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-accelerator-images/global/images/ubuntu-accelerator-2404-amd64-with-nvidia-595-v20260925"
+      },
+      {
+       "key": "SourceType",
+       "value": "RAW"
+      },
+      {
+       "key": "Status",
+       "value": "READY"
+      },
+      {
+       "key": "StorageLocations",
+       "value": "europe-west6; me-central2; africa-south1; europe-west4; us-west2; asia-northeast3; northamerica-northeast1; us-west8; asia-east2; europe-west3; us; eu; southamerica-west1; europe-southwest1; europe-west9; northamerica-northeast2; asia; asia-northeast2; asia-southeast2; us-east7; europe-west15; us-east5; us-central2; northamerica-south1; asia-east1; us-west1; australia-southeast2; us-south1; asia-south1; us-central1; asia-northeast1; europe-west8; us-west4; europe-west12; me-central1; us-west3; europe-west10; europe-north2; asia-south2; europe-west1; australia-southeast1; europe-west2; europe-central2; us-east1; asia-southeast1; us-east4; me-west1; southamerica-east1; asia-southeast3; europe-north1"
+      }
+     ],
+     "systemLabel": "",
+     "description": "Canonical, Ubuntu, 24.04 LTS NVIDIA version: 595, amd64 noble image built on 2026-09-25",
+     "commandHistory": null
+    }
+   ],
+   "targetSecurityGroupList": [
+    {
+     "name": "sg-01",
+     "connectionName": "gcp-asia-northeast3",
+     "vNetId": "vnet-01",
+     "description": "Recommended security group for ec2-widgetrag-shell-aws",
+     "firewallRules": [
+      {
+       "Ports": "22",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "0.0.0.0/0"
+      },
+      {
+       "Ports": "80",
+       "Protocol": "tcp",
+       "Direction": "inbound",
+       "CIDR": "203.0.113.254/32"
+      }
+     ],
+     "cspResourceId": ""
+    }
+   ],
+   "targetK8sCluster": {
+    "connectionName": "",
+    "description": "",
+    "name": "",
+    "version": "",
+    "vNetId": "",
+    "subnetIds": null,
+    "securityGroupIds": null,
+    "k8sNodeGroupList": null,
+    "cspResourceId": "",
+    "label": null,
+    "systemLabel": ""
+   }
+  }
+ ]
+}

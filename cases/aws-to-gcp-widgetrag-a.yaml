@@ -1,0 +1,40 @@
+# 테스트 5 — AWS→GCP, WidgetRAG Shell(A→A). Beetle 추천 · 생성 · 데이터 이관을 쓴다 (Beetle 환경이 있어야 한다).
+case: aws-to-gcp-widgetrag-a
+workload: widgetrag-a
+source:
+  tumblebug: default
+  ns: default
+  infra: widgetrag-src-aws            # 테스트 4 와 같은 소스를 쓴다
+target:
+  provider: beetle
+  tumblebug: default                  # Beetle 이 만든 인프라가 사는 Tumblebug (settings 이름) — 기동 · 키 조회에 쓴다
+  csp: gcp
+  region: asia-northeast3
+  zone: null
+  ns: default
+  name: wr-gcp                        # Beetle nameSeed
+  spec: null
+  image: null
+policy:
+  gpu: same-model-first               # 같은 칩 우선. 단 Tumblebug 의 GCP 사양 목록에 T4 가 없다(서울: L4 · A100 · H100) →
+                                      # T4 소스면 L4 로 간다(테스트2 WARN 예상). 소스를 AWS g6.xlarge(L4)로 두면 같은 칩 — 결정 필요
+  image: ubuntu-24.04                 # 추천 이미지가 24.04 이고 드라이버가 driver_series 와 같으면 그대로 쓴다
+  driver_series: "595"                # GCP 추천 이미지 = ubuntu-accelerator-2404 + NVIDIA 595 (2026-10-22 확인)
+  root_disk_gb: 100
+  open_ports:
+    - { port: 80, cidr: "${GMP_WEB_ALLOW_CIDR}" }   # 사무실 공인 IP/32 같은 출발지 — 공인 IP 로 화면 확인용 (결정 필요: 개방 범위)
+  on_perf_fail: stop
+transfer:
+  method: beetle
+  strategy: direct                    # 소스 → 타겟 22 직접 (막히면 relay)
+run:
+  env:
+    LLM_TEMPERATURE: "0"
+    LLM_SEED: "42"
+    COMPARE: "1"
+    CODE_SOURCE: package
+    VERIFY_ADMIN_PASSWORD: "${GMP_VERIFY_ADMIN_PASSWORD}"   # 타겟 검증 로그인 — 소스 WidgetRAG 관리자 비밀번호와 같은 값
+  golden: true
+  rebuild_before_backup: true
+  timeout_start_min: 75
+cleanup: suspend

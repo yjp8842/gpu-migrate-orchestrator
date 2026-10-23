@@ -1,0 +1,4 @@
+{"commands": [{"index": 3, "xRequestId": "gmp-20261022-100000-backup-abc123", "commandRequested": "cd ~/WidgetRAG/scripts && GOLDEN=1 RUNTIME=native bash package.sh backup ~/widgetrag-backup/20261022-100000",
+               "commandExecuted": "…", "status": "Completed", "startedTime": "2026-10-22T01:00:00Z", "completedTime": "2026-10-22T01:06:12Z",
+               "elapsedTime": "6m12s", "resultSummary": "exit 0", "stdout": "[package] 패키지 완료: /home/cb-user/widgetrag-backup/20261022-100000", "stderr": ""}],
+ "total": 1, "limit": 100}

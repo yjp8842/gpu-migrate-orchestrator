@@ -1,0 +1,17 @@
+{"status": "partially-matched", "data": [
+ {"status": "ok", "description": "candidate 1",
+  "targetInfra": {"name": "mig-infra", "nodeGroups": [{"name": "g1", "nodeGroupSize": 1, "specId": "gcp+asia-northeast3+g2-standard-4", "imageId": "gcp+asia-northeast3+deeplearning-ubuntu-2204", "rootDiskSize": 50}]},
+  "targetVNet": {"name": "mig-vnet"}, "targetSshKey": {"name": "mig-key"},
+  "targetSpecList": [{"id": "gcp+asia-northeast3+g2-standard-4", "cspSpecName": "g2-standard-4", "vCPU": 4, "memoryGiB": 16, "acceleratorModel": "NVIDIA L4", "acceleratorCount": 1, "acceleratorMemoryGB": 24, "acceleratorType": "gpu", "costPerHour": 0.71}],
+  "targetOsImageList": [{"id": "gcp+asia-northeast3+deeplearning-ubuntu-2204", "isGPUImage": true}],
+  "targetSecurityGroupList": [{"name": "mig-sg", "firewallRules": [{"Ports": "22", "Protocol": "tcp", "Direction": "inbound", "CIDR": "0.0.0.0/0"}]}]},
+ {"status": "ok", "description": "candidate 2",
+  "targetInfra": {"name": "mig-infra", "nodeGroups": [{"name": "g1", "nodeGroupSize": 1, "specId": "gcp+asia-northeast3+n1-standard-4-t4", "imageId": "gcp+asia-northeast3+deeplearning-ubuntu-2204", "rootDiskSize": 50}]},
+  "targetSpecList": [{"id": "gcp+asia-northeast3+n1-standard-4-t4", "cspSpecName": "n1-standard-4 + nvidia-tesla-t4", "vCPU": 4, "memoryGiB": 15, "acceleratorModel": "NVIDIA T4", "acceleratorCount": 1, "acceleratorMemoryGB": 16, "acceleratorType": "gpu", "costPerHour": 0.54}],
+  "targetOsImageList": [{"id": "gcp+asia-northeast3+deeplearning-ubuntu-2204", "isGPUImage": true}],
+  "targetSecurityGroupList": [{"name": "mig-sg", "firewallRules": [{"Ports": "22", "Protocol": "tcp", "Direction": "inbound", "CIDR": "0.0.0.0/0"}]}]},
+ {"status": "ok", "description": "candidate 3 (AMD)",
+  "targetInfra": {"name": "mig-infra", "nodeGroups": [{"name": "g1", "nodeGroupSize": 1, "specId": "aws+ap-northeast-2+g4ad.xlarge", "imageId": "x", "rootDiskSize": 50}]},
+  "targetSpecList": [{"id": "aws+ap-northeast-2+g4ad.xlarge", "cspSpecName": "g4ad.xlarge", "vCPU": 4, "memoryGiB": 16, "acceleratorModel": "AMD Radeon Pro V520", "acceleratorCount": 1, "acceleratorMemoryGB": 8, "acceleratorType": "gpu", "costPerHour": 0.40}],
+  "targetOsImageList": [], "targetSecurityGroupList": []}
+]}

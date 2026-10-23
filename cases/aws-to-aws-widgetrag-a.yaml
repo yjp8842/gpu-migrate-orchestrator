@@ -1,0 +1,38 @@
+# 테스트 4 — AWS→AWS, WidgetRAG Shell(A→A) 리허설. Beetle 없이 Tumblebug 만으로 끝까지 돈다.
+case: aws-to-aws-widgetrag-a
+workload: widgetrag-a
+source:
+  tumblebug: default
+  ns: default
+  infra: widgetrag-src-aws            # MapUI 로 먼저 만든 소스 (Running · 데이터 적재 끝). 10/22 기존 widgetrag-shell-aws 는 Terminated
+target:
+  provider: tumblebug                 # Tumblebug infraDynamic 으로 직접 생성
+  tumblebug: default
+  csp: aws
+  region: ap-northeast-2
+  zone: null                          # 고정하면 VPC 한도에 걸릴 수 있다 (VpcLimitExceeded) — Auto
+  ns: default
+  name: wr-aws-tgt-01                 # 인프라 이름 (겹치면 조회로 이어 간다)
+  spec: aws+ap-northeast-2+g4dn.xlarge
+  image: ami-0d222b26b6fb4eeed        # Tumblebug 이미지 ID = AMI (ubuntu-noble-24.04 server 20260923, 10/16 Shell VM 과 같은 것). 없으면 searchImage 로 'ubuntu 24.04
+policy:
+  gpu: same-model-first
+  image: ubuntu-24.04
+  root_disk_gb: 100
+  open_ports:
+    - { port: 80, cidr: "${GMP_WEB_ALLOW_CIDR}" }   # 사무실 공인 IP/32 같은 출발지 — 공인 IP 로 화면 확인용 (결정 필요: 개방 범위)
+  on_perf_fail: stop
+transfer:
+  method: beetle                      # Beetle 데이터 이관 (소스 → 타겟 rsync) — 유일한 이관 경로
+  strategy: direct                    # 소스 → 타겟 22 직접 (막히면 relay)
+run:
+  env:
+    LLM_TEMPERATURE: "0"
+    LLM_SEED: "42"
+    COMPARE: "1"
+    CODE_SOURCE: package              # 트리가 없으면 멈춘다 (auto 면 조용히 clone 으로 빠진다)
+    VERIFY_ADMIN_PASSWORD: "${GMP_VERIFY_ADMIN_PASSWORD}"   # 타겟 검증 로그인 — 소스 WidgetRAG 관리자 비밀번호와 같은 값
+  golden: true
+  rebuild_before_backup: true
+  timeout_start_min: 75
+cleanup: suspend

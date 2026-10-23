@@ -1,0 +1,29 @@
+# WidgetRAG · Shell 설치형(A) — 파이프라인이 이 워크로드에 대해 아는 전부.
+# 명령 문자열은 WidgetRAG/scripts/local/README.md 의 한 줄과 같게 유지한다. {env} 는 사례 run.env 가 'K=V K=V' 로 들어온다.
+workload: widgetrag
+form: shell
+repo_raw: https://raw.githubusercontent.com/ghd329/WidgetRAG
+branch: feat/20260922-change-sqlite
+# 타겟 진입 한 줄 — 패키지가 ~/widgetrag-package 에 있으면 SNAPSHOT_URI 없이 트리 전개 · 복원 · 기동 · 검증까지 간다
+entry: "set -o pipefail; curl -fsSL {repo_raw}/{branch}/scripts/local/bootstrap.sh | {env} bash"
+# 소스에서 backup 전에 — jar 안의 구 설정 사본 제거 + 골든 전제(temperature · seed)로 재기동. {env} 가 꼭 붙어야 한다
+rebuild: "cd ~/WidgetRAG/scripts/local && {env} ./40-start-apps.sh --rebuild"
+backup: "cd ~/WidgetRAG/scripts && GOLDEN={golden} RUNTIME=native bash package.sh backup {out_dir}"
+backup_out: "~/widgetrag-backup/{ts}"
+package_dir: "~/widgetrag-package"
+results:
+  csv: "~/widgetrag-run/results.csv"
+  compare: "~/widgetrag-run/migration-compare.csv"
+  evidence: "~/widgetrag-run/migration-*"
+logs:
+  run: "~/tc-run.log"            # 분리 실행한 진입 한 줄의 출력
+  exit: "~/tc-run.exit"          # 진입 한 줄의 종료 코드 (재부팅 전 구간)
+resume_unit: widgetrag-bootstrap-resume
+services: [opensearch, ollama, widgetrag-ai, widgetrag-backend, widgetrag-frontend]
+identify:                        # 식별 대조표의 소스 쪽 — package 단계의 상태 확인이 읽는 위치
+  units: [widgetrag-ai, widgetrag-backend, widgetrag-frontend]
+  env_file: /etc/widgetrag/widgetrag.env          # 키 목록만 읽는다 (값에 비밀값)
+  config: /etc/widgetrag/application-local.yaml
+  tree: ~/WidgetRAG
+ports: { web: 80, backend: 8080, ai: 8000, ollama: 11434, opensearch: 9200 }
+health: "http://127.0.0.1:8000/health"           # llm_temperature · llm_seed 로 골든 전제 확인

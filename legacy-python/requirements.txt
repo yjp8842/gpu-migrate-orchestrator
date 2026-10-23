@@ -1,0 +1,6 @@
+# 이관 오케스트레이터 (gpu-migrate-orchestrator) 의존성
+# 설치: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+pyyaml>=6.0
+requests>=2.31
+# Beetle 데이터 이관(비밀 필드 암호화) — 지연 import 라 없어도 Tumblebug 경로는 돈다
+cryptography>=42

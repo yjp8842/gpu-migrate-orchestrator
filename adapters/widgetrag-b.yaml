@@ -1,0 +1,27 @@
+# WidgetRAG · Docker Compose(B). 실행 파일은 이미지(IMAGE_TAG)라 backup 에 실행 파일 층이 없다 —
+# B 소스에서 A 타겟으로 가려면 타겟 사례의 run.env 를 CODE_SOURCE=git 으로 두어야 한다.
+workload: widgetrag
+form: compose
+repo_raw: https://raw.githubusercontent.com/ghd329/WidgetRAG
+branch: feat/20260922-change-sqlite
+entry: "set -o pipefail; curl -fsSL {repo_raw}/{branch}/scripts/compose/deploy.sh | {env} bash"
+rebuild: null                     # compose 는 재빌드가 없다 — 결정적 설정은 .env 에 있어 재기동만 (restart)
+restart: "cd ~/widgetrag-deploy && {env} bash deploy.sh"
+backup: "cd ~/widgetrag-deploy && GOLDEN={golden} RUNTIME=compose COMPOSE_DIR=$HOME/widgetrag-deploy bash package.sh backup {out_dir}"
+backup_out: "~/widgetrag-backup/{ts}"
+package_dir: "~/widgetrag-deploy/package"
+results:
+  csv: "~/widgetrag-run/results.csv"
+  compare: "~/widgetrag-run/migration-compare.csv"
+  evidence: "~/widgetrag-run/migration-*"
+logs:
+  run: "~/tc-run.log"
+  exit: "~/tc-run.exit"
+resume_unit: widgetrag-compose-resume
+services: [opensearch, llm, ai-server, backend, frontend]
+identify:
+  compose: [~/widgetrag-deploy/docker-compose.yml, ~/widgetrag-deploy/docker-compose.images.yml]
+  env_file: ~/widgetrag-deploy/.env               # 키 목록만
+  tree: ~/widgetrag-deploy
+ports: { web: 80 }
+health: "http://127.0.0.1:8000/health"

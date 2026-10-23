@@ -1,0 +1,223 @@
+{
+ "captured": "2026-10-22 Tumblebug v0.12.30 · widgetrag-compose-aws (Terminated 뒤에도 기록 조회 가능)",
+ "infra": {
+  "id": "widgetrag-compose-aws",
+  "status": "Terminated:1 (R:0/1)",
+  "node": [
+   {
+    "id": "g1-1",
+    "name": "g1-1",
+    "nodeGroupId": "g1",
+    "status": "Terminated",
+    "region": {
+     "region": "ap-northeast-2",
+     "zone": "ap-northeast-2c"
+    },
+    "cspResourceId": "i-0123456789abcdef0",
+    "specId": "aws+ap-northeast-2+g4dn.xlarge",
+    "cspSpecName": "g4dn.xlarge",
+    "imageId": "ami-058c8c1efe6b29f19",
+    "cspImageName": "ami-058c8c1efe6b29f19",
+    "rootDiskType": "gp3",
+    "rootDiskSize": 100,
+    "vNetId": "default-shared-aws-ap-northeast-2",
+    "subnetId": "default-shared-aws-ap-northeast-2-01",
+    "securityGroupIds": [
+     "widgetrag-compose-aws-g1"
+    ],
+    "privateIP": "10.2.70.79",
+    "publicIP": "",
+    "connectionName": "aws-ap-northeast-2",
+    "nodeUserName": "cb-user",
+    "label": {
+     "accelerator": "gpu"
+    },
+    "spec": {
+     "cspSpecName": "g4dn.xlarge",
+     "vCPU": 4,
+     "memoryGiB": 16,
+     "acceleratorModel": "NVIDIA T4",
+     "acceleratorCount": 1,
+     "acceleratorMemoryGB": 17,
+     "acceleratorType": "gpu",
+     "costPerHour": 0.647
+    },
+    "image": {
+     "resourceType": "image",
+     "cspImageName": "ami-058c8c1efe6b29f19",
+     "osType": "Ubuntu 24.04",
+     "osArchitecture": "x86_64",
+     "osDistribution": "ubuntu-minimal/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-minimal-20260925"
+    }
+   }
+  ]
+ },
+ "spec": {
+  "id": "aws+ap-northeast-2+g4dn.xlarge",
+  "uid": "tburubuckamimav69o1g",
+  "cspSpecName": "g4dn.xlarge",
+  "name": "aws+ap-northeast-2+g4dn.xlarge",
+  "namespace": "system",
+  "connectionName": "aws-ap-northeast-2",
+  "providerName": "aws",
+  "regionName": "ap-northeast-2",
+  "regionLatitude": 37.36,
+  "regionLongitude": 126.78,
+  "infraType": "node",
+  "architecture": "x86_64",
+  "vCPU": 4,
+  "memoryGiB": 16,
+  "diskSizeGB": -1,
+  "acceleratorModel": "NVIDIA T4",
+  "acceleratorCount": 1,
+  "acceleratorMemoryGB": 17,
+  "acceleratorType": "gpu",
+  "costPerHour": 0.647,
+  "evaluationScore01": -1,
+  "evaluationScore02": -1,
+  "evaluationScore03": -1,
+  "evaluationScore04": -1,
+  "evaluationScore05": -1,
+  "evaluationScore06": -1,
+  "evaluationScore07": -1,
+  "evaluationScore08": -1,
+  "evaluationScore09": -1,
+  "evaluationScore10": -1,
+  "rootDiskType": "",
+  "rootDiskSize": -1,
+  "systemLabel": "auto-gen",
+  "details": [
+   {
+    "key": "AutoRecoverySupported",
+    "value": "false"
+   },
+   {
+    "key": "BareMetal",
+    "value": "false"
+   },
+   {
+    "key": "BurstablePerformanceSupported",
+    "value": "false"
+   },
+   {
+    "key": "CurrentGeneration",
+    "value": "true"
+   },
+   {
+    "key": "DedicatedHostsSupported",
+    "value": "false"
+   },
+   {
+    "key": "EbsInfo",
+    "value": "{EbsOptimizedInfo:{BaselineBandwidthInMbps:950,BaselineIops:3000,BaselineThroughputInMBps:118.75,MaximumBandwidthInMbps:3500,MaximumIops:20000,MaximumThroughputInMBps:437.5},EbsOptimizedSupport:default,EncryptionSupport:supported,NvmeSupport:required}"
+   },
+   {
+    "key": "FreeTierEligible",
+    "value": "false"
+   },
+   {
+    "key": "GpuInfo",
+    "value": "{Gpus:[{Count:1,Manufacturer:NVIDIA,MemoryInfo:{SizeInMiB:16384},Name:T4}],TotalGpuMemoryInMiB:16384}"
+   },
+   {
+    "key": "HibernationSupported",
+    "value": "false"
+   },
+   {
+    "key": "Hypervisor",
+    "value": "nitro"
+   },
+   {
+    "key": "InstanceStorageInfo",
+    "value": "{Disks:[{Count:1,SizeInGB:125,Type:ssd}],NvmeSupport:required,TotalSizeInGB:125}"
+   },
+   {
+    "key": "InstanceStorageSupported",
+    "value": "true"
+   },
+   {
+    "key": "InstanceType",
+    "value": "g4dn.xlarge"
+   },
+   {
+    "key": "MemoryInfo",
+    "value": "{SizeInMiB:16384}"
+   },
+   {
+    "key": "NetworkInfo",
+    "value": "{DefaultNetworkCardIndex:0,EfaInfo:null,EfaSupported:false,EnaSupport:required,Ipv4AddressesPerInterface:10,Ipv6AddressesPerInterface:10,Ipv6Supported:true,MaximumNetworkCards:1,MaximumNetworkInterfaces:3,NetworkCards:[{MaximumNetworkInterfaces:3,NetworkCardIndex:0,NetworkPerformance:Up to 25 Gigabit}],NetworkPerformance:Up to 25 Gigabit}"
+   },
+   {
+    "key": "PlacementGroupInfo",
+    "value": "{SupportedStrategies:[cluster,partition,spread]}"
+   },
+   {
+    "key": "ProcessorInfo",
+    "value": "{SupportedArchitectures:[x86_64],SustainedClockSpeedInGhz:2.5}"
+   },
+   {
+    "key": "SupportedBootModes",
+    "value": "legacy-bios; uefi"
+   },
+   {
+    "key": "SupportedRootDeviceTypes",
+    "value": "ebs"
+   },
+   {
+    "key": "SupportedUsageClasses",
+    "value": "on-demand; spot"
+   },
+   {
+    "key": "SupportedVirtualizationTypes",
+    "value": "hvm"
+   },
+   {
+    "key": "VCpuInfo",
+    "value": "{DefaultCores:2,DefaultThreadsPerCore:2,DefaultVCpus:4,ValidCores:[2],ValidThreadsPerCore:[1,2]}"
+   }
+  ]
+ },
+ "image": {
+  "id": "ami-058c8c1efe6b29f19",
+  "cspImageName": "ami-058c8c1efe6b29f19",
+  "osType": "Ubuntu 24.04",
+  "osDistribution": "ubuntu-minimal/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-minimal-20260925",
+  "osArchitecture": "x86_64",
+  "isGPUImage": false,
+  "isBasicImage": true,
+  "osPlatform": "Linux/UNIX"
+ },
+ "vnet": {
+  "id": "default-shared-aws-ap-northeast-2",
+  "cidrBlock": "10.2.0.0/16",
+  "subnetInfoList": [
+   {
+    "id": "default-shared-aws-ap-northeast-2",
+    "ipv4_CIDR": "10.2.0.0/18",
+    "zone": "ap-northeast-2b"
+   },
+   {
+    "id": "default-shared-aws-ap-northeast-2-01",
+    "ipv4_CIDR": "10.2.64.0/18",
+    "zone": "ap-northeast-2c"
+   }
+  ]
+ },
+ "sg": {
+  "id": "widgetrag-compose-aws-g1",
+  "firewallRules": [
+   {
+    "Port": "22",
+    "Protocol": "TCP",
+    "Direction": "inbound",
+    "CIDR": "0.0.0.0/0"
+   },
+   {
+    "Port": "",
+    "Protocol": "ALL",
+    "Direction": "outbound",
+    "CIDR": "0.0.0.0/0"
+   }
+  ]
+ }
+}

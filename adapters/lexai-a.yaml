@@ -1,0 +1,4 @@
+# LexAI(legal-rag-chatbot feat/sqlite) · 네이티브(A) — 자리만. 실행 파일 층 이식과 변수 이름 맞춤이 끝나면 채운다.
+todo: "LexAI 인터페이스 정렬(준비 모드 · backup 명령 · PACKAGE_DIR 복원 · 결과 파일 위치) 뒤에 채운다"
+workload: lexai
+form: shell
