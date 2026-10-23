@@ -288,6 +288,11 @@ func execute(ctx *stages.Context, names []string) int {
 			result = res
 		}
 		ctx.State.Mark(name, "done", "", result)
+		if name == "cleanup" { // summary.md 는 cleanup 안에서 쓰이므로, 끝난 상태로 한 번 더 쓴다
+			if err := stages.WriteSummary(ctx); err != nil {
+				ctx.Log.Warn(name, "summary.md 갱신 실패: %v", err)
+			}
+		}
 		if name == "verify" {
 			if r := ctx.State.VerdictResult(); r == "FAIL" || r == "NO-RESULT" {
 				ctx.Log.Warn(name, "판정이 %s 라 cleanup 뒤 종료 코드 1 로 끝납니다", r)

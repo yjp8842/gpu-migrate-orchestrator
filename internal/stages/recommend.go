@@ -48,6 +48,27 @@ func sourceGPU(model any) M {
 	return M{"vendor": "", "model": "", "memoryTotalGB": 0}
 }
 
+// sourceImageWant 는 소스 OS 를 policy.image 형식('ubuntu-22.04')으로 바꾼다 (모르면 "").
+func sourceImageWant(model any) string {
+	nodes := jsonx.ListM(jsonx.Get(model, "nodes"))
+	if len(nodes) == 0 {
+		return ""
+	}
+	osm := jsonx.AsM(nodes[0]["os"])
+	name := strings.ToLower(jsonx.SOr(osm, "id", jsonx.S(osm, "name")))
+	ver := jsonx.SOr(osm, "versionId", jsonx.S(osm, "version"))
+	if f := strings.Fields(ver); len(f) > 0 {
+		ver = f[0] // '22.04.5 LTS (…)' 같은 꼴 → '22.04.5'
+	}
+	if parts := strings.Split(ver, "."); len(parts) > 2 {
+		ver = parts[0] + "." + parts[1]
+	}
+	if name == "" || ver == "" {
+		return ""
+	}
+	return name + "-" + ver
+}
+
 // resolveImage 는 사례 image → Tumblebug(system ns)에 있으면 그대로. 없으면 policy.image(예 ubuntu-24.04 → 'ubuntu 24.04')로
 // searchImage 해 기본 이미지 중 minimal 이 아닌 것을 고른다. 이 Tumblebug 의 이미지 ID 는 CSP 이미지 이름(aws 는 ami-…)이다.
 func resolveImage(ctx *Context, tb Tumblebug, ns, csp, region, want string) (string, string, error) {
@@ -121,6 +142,14 @@ func runRecommend(ctx *Context) (M, error) {
 	model, err := ctx.ReadJSON(stCollect, "source-model.json")
 	if err != nil {
 		return nil, err
+	}
+	if jsonx.S(pol, "image") == "source" { // 소스와 같은 OS · 버전으로 (기본)
+		want := sourceImageWant(model)
+		if want == "" {
+			return nil, Errf("policy.image=source 인데 소스 모델에 OS 정보가 없습니다 — 사례 policy.image 에 'ubuntu-22.04' 처럼 적어 주세요")
+		}
+		pol["image"] = want
+		ctx.Log.Info(stRecommend, "policy.image=source → 소스 OS %s", want)
 	}
 	src := sourceGPU(model)
 	var ports []string

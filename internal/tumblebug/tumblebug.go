@@ -1,8 +1,13 @@
-// Package tumblebug 는 CB-Tumblebug REST 클라이언트다 (Basic 인증). 공용 서버의 배포본은 0.13.4 다.
-// 아래 규칙은 v0.12.30 소스를 읽고 정한 뒤 배포본 실호출로 확인한 것이다 — 0.13.x 에서 달라진 동작(예: 503 + Retry-After)은 아직 반영하지 않았다.
+// Package tumblebug 는 CB-Tumblebug REST 클라이언트다 (Basic 인증).
+// 아래 규칙은 공용 서버 배포본 v0.13.4 (1517cac) 소스와 그 서버의 /api/doc.json · 실호출로 확인했다.
+// (503 + Retry-After · 409 중복 요청은 Beetle 의 동작이다 — Tumblebug 0.13.4 에는 없다.)
 //
-//   - 호출 간격: GET /ns/{ns}/infra[/{id}] 는 출발 IP 당 2 req/s 를 MapUI 사용자와 나눠 쓴다 → 1초 간격. 나머지는 0.25초.
-//   - 429 는 Retry-After 가 없다 → 지수 백오프(2→4→…≤60초, 지터, 최대 10회). 429 는 서버가 받지 않은 요청이라 POST 도 다시 보낸다.
+//   - 호출 제한: 전체 50 req/s, GET /ns/{ns}/infra[/{id}] 는 2 req/s (출발 IP 당, MapUI 사용자와 나눠 씀) → 1초 간격. 나머지는 0.25초.
+//   - 429 는 Retry-After 가 없다 → 지수 백오프(2→4→…≤60초, 지터, 최대 10회). 제한은 요청 ID 기록보다 앞에서 걸리므로
+//     429 는 서버가 받지 않은 요청이다 → POST 도 같은 X-Request-Id 로 다시 보낸다.
+//   - 이미 쓴 X-Request-Id 를 다시 보내면 500 "Internal Server Error" 만 온다 (본문으로 구분 불가, 30분 뒤 잊음).
+//     그래서 cmd 재개는 다시 보내지 않고 commandStatus 로 상태를 이어 보며, 다시 보낼 때는 새 ID 를 쓴다.
+//   - 원격 명령 timeoutMinutes 는 1~120.
 //   - 5xx · 네트워크 오류는 GET 만 재시도한다. 생성(infraDynamic) · 원격 명령(cmd) POST 는 자동 재시도하지 않는다.
 //   - 재개는 이름 조회(infra)와 우리가 정한 X-Request-Id(cmd)로 이어 간다.
 //   - dry-run 은 조회만 한다. 쓰기 여부는 메서드가 아니라 호출별로 정한다 (제어는 GET 이지만 쓰기, searchImage · recommendSpec 은 POST 지만 조회).
@@ -463,7 +468,7 @@ type Filter struct {
 func F(metric, op string, value any) Filter { return Filter{Metric: metric, Op: op, Value: value} }
 
 // RecommendSpec 은 POST /tumblebug/recommendSpec — 조건으로 사양 목록을 정렬해 받는다 (Beetle 추천의 축소판).
-// 타입 주의 (v0.12.30 소스, 배포본 0.13.4 실호출로 확인): weight 는 float, limit 은 int, operand 는 문자열 — 틀리면 400 Unmarshal type error.
+// 타입 주의 (v0.13.4 소스 · 배포본 실호출로 확인): weight 는 float, limit 은 int, operand 는 문자열 — 틀리면 400 Unmarshal type error.
 func (c *Client) RecommendSpec(filters []Filter, priority string, limit int) ([]M, error) {
 	var policy []any
 	for _, f := range filters {

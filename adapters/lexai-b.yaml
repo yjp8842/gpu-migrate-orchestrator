@@ -1,4 +1,40 @@
-# LexAI · Docker Compose(B) — 자리만.
-todo: "LexAI 인터페이스 정렬 뒤에 채운다"
+# LexAI (YunHwa0905/legal-rag-chatbot feat/sqlite) · Docker Compose(B).
+# 순서는 저장소 deploy/compose/README.md 「Beetle 로 이관」과 같다: 소스 backup → Beetle 2건(패키지 · 배포 디렉터리) → 타겟에서 옮겨 온 deploy.sh.
+# DB · 색인은 Docker 볼륨 안이라 홈 디렉터리 전송으로는 옮겨지지 않는다 — 반드시 패키지로 옮긴다.
 workload: lexai
 form: compose
+entry: "NO_UPDATE=1 SNAPSHOT_URI={package_dir} {env} bash ~/lexai-compose/deploy.sh"
+proc_pattern: "lexai-compose/deploy.sh"
+backup: "OUT_DIR={out_dir} STOP_WRITES=1 bash ~/lexai-compose/backup.sh"
+backup_out: "~/lexai-backup/{ts}"
+package_dir: "~/lexai-backup/latest"
+transfer:
+  - { from: "{backup_out}/", to: "{package_dir}", fresh: true, verify: true }
+  - from: "~/lexai-compose/"
+    to: "~/lexai-compose"
+    delete: true
+    exclude: [deploy/snapshots, .restore]   # 수 GB · OpenSearch(uid 1000) 소유 — 타겟에서 패키지로 다시 만든다
+done:
+  type: status_file
+  path: ~/lexai-run/status.json
+  field: state
+  success: [success]
+  failure: [failed]
+results:
+  status:
+    path: ~/lexai-run/status.json
+    require: { state: [success], data_check: [PASS] }
+logs:
+  run: "~/lexai-boot.log"
+  exit: "~/lexai-boot.exit"
+resume_unit: lexai-compose-resume
+existing_check: "sudo docker volume ls -q 2>/dev/null | grep -E '_(lexai_data|opensearch_data)$'"
+existing_env: "FORCE_CLEAN=1"
+source_restore: "cd ~/lexai-compose && sudo docker compose start frontend tomcat"
+services: [opensearch, ollama, ai, tomcat, frontend]
+identify:
+  compose: [~/lexai-compose/docker-compose.yml, ~/lexai-compose/docker-compose.registry.yml, ~/lexai-compose/docker-compose.lock.yml]
+  env_file: ~/lexai-compose/.env
+  tree: ~/lexai-compose
+  code_ref: "cut -c1-7 ~/lexai-compose/DEPLOY_COMMIT 2>/dev/null || echo unknown"
+  packages: [docker-ce, nvidia-container-toolkit]

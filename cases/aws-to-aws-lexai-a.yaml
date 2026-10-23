@@ -1,0 +1,32 @@
+# LexAI 네이티브(A→A), AWS→AWS. Beetle 추천 · 생성 · 데이터 이관.
+case: aws-to-aws-lexai-a
+workload: lexai-a
+source:
+  tumblebug: default
+  ns: default
+  infra: lexai-shell-aws              # MapUI 로 만든 소스 (Running · 데이터 적재 끝이어야 실제 실행 가능 — 10/23 현재 Terminated)
+target:
+  provider: beetle
+  tumblebug: default
+  csp: aws
+  region: ap-northeast-2
+  zone: null
+  ns: default
+  name: lx-aws                        # Beetle nameSeed 앞부분 (run 마다 뒤에 시각이 붙는다)
+  spec: null
+  image: null
+policy:
+  gpu: same-model-first
+  image: source                      # 소스와 같은 OS · 버전 (LexAI 소스는 Ubuntu 22.04)
+  root_disk_gb: 100
+  open_ports:
+    - { port: 80, cidr: "${GMP_WEB_ALLOW_CIDR}" }
+  on_perf_fail: stop
+transfer:
+  method: beetle
+  strategy: direct
+run:
+  env: {}
+  timeout_start_min: 75
+  on_existing: stop
+cleanup: suspend

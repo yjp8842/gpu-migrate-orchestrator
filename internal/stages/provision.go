@@ -90,7 +90,7 @@ func runProvision(ctx *Context) (M, error) {
 	if ctx.DryRun {
 		what := "Tumblebug POST /infraDynamic"
 		if provider != "tumblebug" {
-			what = fmt.Sprintf("Beetle POST /migration/ns/%s/infra?nameSeed=%s", ns, name)
+			what = fmt.Sprintf("Beetle POST /migration/ns/%s/infra?nameSeed=%s&useExisting=false", ns, NameSeed(name, ctx.State.Data.RunID))
 		}
 		ctx.Dry(stProvision, what, req)
 		ctx.SetNodes("target", []M{{"nodeId": "g1-1", "publicIP": "<target.publicIP>", "sshPort": 22, "nodeUserName": "cb-user"}}, "")
@@ -135,25 +135,44 @@ func runProvision(ctx *Context) (M, error) {
 			}
 		}
 	} else if infra == nil {
-		if ctx.State.HasKey("beetle_migrate_started") {
-			return nil, Errf("Beetle 생성을 시작했지만 인프라 ID 를 모릅니다 — Beetle UI 에서 ID 를 찾아 state.json 의 keys.target_infra_id 에 적고 다시 돌리세요")
-		}
-		ctx.State.SetKey("beetle_migrate_started", true)
 		b, err := ctx.Beetle()
 		if err != nil {
 			return nil, err
 		}
-		data, err := b.MigrateInfra(ns, req, name, true, 30*time.Minute)
-		if err != nil {
-			return nil, err
+		seed := ctx.State.KeyS("beetle_name_seed")
+		if ctx.State.HasKey("beetle_migrate_started") {
+			// 앞선 생성 요청의 응답을 못 받고 멈췄다 — run 마다 고유한 nameSeed 로 Beetle 이 만든 인프라를 찾아 이어 간다
+			found, err := findSeeded(b, ns, seed)
+			if err != nil {
+				return nil, err
+			}
+			if found == "" {
+				return nil, Errf("Beetle 생성을 시작했지만 nameSeed %s 로 만든 인프라가 없습니다 — Beetle UI 에서 ID 를 찾아 state.json 의 keys.target_infra_id 에 적고 다시 돌리세요", seed)
+			}
+			id = found
+			ctx.State.SetKey("target_infra_id", id)
+			ctx.Log.Warn(stProvision, "앞선 Beetle 생성 요청이 만든 인프라 %s 를 찾아 이어 갑니다", id)
+		} else {
+			if seed == "" {
+				seed = NameSeed(name, ctx.State.Data.RunID)
+				ctx.State.SetKey("beetle_name_seed", seed) // 부작용 전에 기록
+			}
+			ctx.State.SetKey("beetle_migrate_started", true)
+			// ★ useExisting=false — 기본값 true 는 같은 이름의 vNet · SSH 키 · 보안 그룹을 재사용해, 다른 run(사례)의
+			//   자원을 끌어다 쓰고 정리 때 함께 지울 수 있다. nameSeed 도 run 마다 달라 이름이 겹치지 않는다.
+			ctx.Log.Info(stProvision, "Beetle 생성 요청: nameSeed %s · useExisting=false (동기, 수 분)", seed)
+			data, err := b.MigrateInfra(ns, req, seed, false, 30*time.Minute)
+			if err != nil {
+				return nil, err
+			}
+			id = jsonx.Str(jsonx.Or(data["id"], data["name"]))
+			if id == "" {
+				raw, _ := jsonx.Marshal(data, false)
+				return nil, Errf("Beetle 생성 응답에 인프라 ID 가 없습니다: %s", headStr(string(raw), 300))
+			}
+			ctx.State.SetKey("target_infra_id", id)
+			ctx.Log.Info(stProvision, "Beetle 가 만든 인프라: %s (%s)", id, jsonx.S(data, "status"))
 		}
-		id = jsonx.Str(jsonx.Or(data["id"], data["name"]))
-		if id == "" {
-			raw, _ := jsonx.Marshal(data, false)
-			return nil, Errf("Beetle 생성 응답에 인프라 ID 가 없습니다: %s", headStr(string(raw), 300))
-		}
-		ctx.State.SetKey("target_infra_id", id)
-		ctx.Log.Info(stProvision, "Beetle 가 만든 인프라: %s (%s)", id, jsonx.S(data, "status"))
 	}
 
 	infra, err = tb.WaitInfra(ns, id, []string{"Running"}, 15*time.Minute, 20*time.Second, TickLogger(ctx.Log, stProvision, 4))
@@ -198,6 +217,59 @@ func runProvision(ctx *Context) (M, error) {
 		return nil, err
 	}
 	return M{"infra": id, "ip": node["publicIP"]}, nil
+}
+
+// NameSeed 는 Beetle nameSeed 를 run 마다 고유하게 만든다 — 사례의 target.name 뒤에 run 시각(월일시분)을 붙인다.
+// Beetle 규칙: 20자 이하 · 영숫자로 시작 · 영숫자와 '-' 만.
+func NameSeed(name, runID string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			b.WriteRune(r)
+		}
+	}
+	base := strings.Trim(b.String(), "-")
+	if base == "" {
+		base = "gmp"
+	}
+	digits := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, runID)
+	suffix := digits
+	if len(digits) >= 12 {
+		suffix = digits[4:12] // 20261023-101530 → 10231015
+	}
+	if max := 20 - 1 - len(suffix); len(base) > max {
+		base = strings.TrimRight(base[:max], "-")
+	}
+	return base + "-" + suffix
+}
+
+// findSeeded 는 Beetle 이 nameSeed 로 만든 인프라 ID 를 찾는다 (Beetle 은 'seed' → 'seed-infra101' 처럼 앞에 붙인다).
+func findSeeded(b Beetle, ns, seed string) (string, error) {
+	if seed == "" {
+		return "", nil
+	}
+	ids, err := b.ListInfraIDs(ns)
+	if err != nil {
+		return "", err
+	}
+	var hits []string
+	for _, id := range ids {
+		if id == seed || strings.HasPrefix(id, seed+"-") {
+			hits = append(hits, id)
+		}
+	}
+	if len(hits) > 1 {
+		return "", Errf("nameSeed %s 로 시작하는 인프라가 여럿입니다 (%s) — state.json 의 keys.target_infra_id 에 직접 적으세요", seed, strings.Join(hits, ", "))
+	}
+	if len(hits) == 1 {
+		return hits[0], nil
+	}
+	return "", nil
 }
 
 func headStr(s string, n int) string {

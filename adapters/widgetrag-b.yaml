@@ -17,11 +17,14 @@ results:
 logs:
   run: "~/tc-run.log"
   exit: "~/tc-run.exit"
+proc_pattern: "scripts/compose/deploy.sh"   # 기동 중인 진입 한 줄을 찾는 pgrep -f 패턴 (이미 돌면 다시 띄우지 않는다)
+package_marker: MANIFEST.txt     # package.sh backup 이 마지막에 쓰는 파일 — 있으면 재개 때 backup 을 건너뛴다
 resume_unit: widgetrag-compose-resume
 services: [opensearch, llm, ai-server, backend, frontend]
 identify:
   compose: [~/widgetrag-deploy/docker-compose.yml, ~/widgetrag-deploy/docker-compose.images.yml]
   env_file: ~/widgetrag-deploy/.env               # 키 목록만
   tree: ~/widgetrag-deploy
+  packages: [docker-ce, nvidia-container-toolkit]
 ports: { web: 80 }
 health: "http://127.0.0.1:8000/health"

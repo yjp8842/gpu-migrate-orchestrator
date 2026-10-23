@@ -321,8 +321,9 @@ type Adapter struct {
 	Raw  jsonx.M
 }
 
-var adapterRequired = []string{"workload", "form", "repo_raw", "branch", "entry", "backup", "backup_out", "package_dir",
-	"results", "resume_unit", "services"}
+// adapterRequired 는 모든 워크로드가 적어야 하는 항목이다. 나머지는 선택 (README 「어댑터 항목」).
+// repo_raw · branch · resume_unit · services · health 같은 것은 그런 것이 있는 워크로드만 적는다.
+var adapterRequired = []string{"workload", "form", "entry", "backup", "backup_out", "package_dir", "results", "proc_pattern"}
 
 // LoadAdapter 는 adapters/<name>.yaml 을 읽는다.
 func LoadAdapter(name string) (*Adapter, error) {
@@ -344,12 +345,139 @@ func LoadAdapter(name string) (*Adapter, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, k := range []string{"csv", "compare", "evidence"} {
-		if _, err := need(res, k, where+" results"); err != nil {
+	// 판정 근거는 결과표(results.csv) · 상태 파일(results.status) 중 하나 이상. compare(골든 비교표) · evidence(증적 폴더)는
+	// 그런 산출물이 있는 워크로드만 적는다.
+	st := jsonx.AsM(res["status"])
+	if jsonx.S(res, "csv") == "" && st == nil {
+		return nil, Errf("%s results: 판정 근거가 없습니다 — csv(결과표) 또는 status(상태 파일 + require) 중 하나는 있어야 합니다", where)
+	}
+	if st != nil {
+		if _, err := need(st, "path", where+" results.status"); err != nil {
 			return nil, err
 		}
+		if jsonx.S(res, "csv") == "" && len(jsonx.AsM(st["require"])) == 0 {
+			return nil, Errf("%s results: csv 없이 상태 파일로만 판정하려면 results.status.require 가 필요합니다", where)
+		}
 	}
-	return &Adapter{Path: path, Raw: raw}, nil
+	ad := &Adapter{Path: path, Raw: raw}
+	done := ad.Done()
+	if err := enum(done.Type, []string{"results_rows", "status_file"}, where+" done.type"); err != nil {
+		return nil, err
+	}
+	if done.Type == "results_rows" && jsonx.S(res, "csv") == "" {
+		return nil, Errf("%s done: 결과표(results.csv)가 없으면 done.type=status_file 로 기동 완료를 판정해야 합니다", where)
+	}
+	if done.Type == "status_file" && (done.Path == "" || done.Field == "" || len(done.Success) == 0) {
+		return nil, Errf("%s done: type=status_file 은 path · field · success 가 필요합니다", where)
+	}
+	for i, it := range jsonx.AsList(raw["transfer"]) {
+		m := jsonx.AsM(it)
+		if m == nil || jsonx.S(m, "from") == "" || jsonx.S(m, "to") == "" {
+			return nil, Errf("%s transfer[%d] 에 from · to 가 필요합니다", where, i)
+		}
+	}
+	return ad, nil
+}
+
+// ---------- 어댑터의 선택 항목 (적지 않으면 지금까지의 동작) ----------
+
+// Logs 는 분리 실행한 단일 명령의 출력 · 종료 코드 파일 위치다.
+func (a *Adapter) Logs() (run, exit string) {
+	l := a.M("logs")
+	return jsonx.SOr(l, "run", "~/tc-run.log"), jsonx.SOr(l, "exit", "~/tc-run.exit")
+}
+
+// ProcPattern 은 기동 중인 단일 명령을 찾는 pgrep -f 패턴이다 (필수 — 이미 돌고 있으면 다시 띄우지 않는다).
+func (a *Adapter) ProcPattern() string { return a.S("proc_pattern") }
+
+// Columns 는 결과표에서 판정에 쓰는 열이다. Result 열이 Pass 값이고 Fail 열(있으면)이 0 이면 PASS.
+// Timestamp 열은 비교표(compare)의 같은 회차 행을 고를 때 쓴다.
+type Columns struct{ Result, Pass, Fail, Timestamp string }
+
+// ResultColumns 는 어댑터 results.columns (없으면 result · PASS · fail · timestamp).
+func (a *Adapter) ResultColumns() Columns {
+	c := jsonx.AsM(a.M("results")["columns"])
+	return Columns{Result: jsonx.SOr(c, "result", "result"), Pass: jsonx.SOr(c, "pass", "PASS"),
+		Fail: jsonx.SOr(c, "fail", "fail"), Timestamp: jsonx.SOr(c, "timestamp", "timestamp")}
+}
+
+// Done 은 기동 완료 판정이다.
+//
+//	results_rows (기본) — results.csv 행 수가 늘면 끝 (워크로드 verify 가 돌았다)
+//	status_file         — 상태 파일의 필드가 success 값이 되면 끝, failure 값이면 실패 (기동 뒤에 갱신된 파일만 본다)
+type Done struct {
+	Type, Path, Field string
+	Success, Failure  []string
+}
+
+// Done 은 어댑터의 done 항목 (없으면 결과표가 있을 때 results_rows).
+func (a *Adapter) Done() Done {
+	d := a.M("done")
+	def := "results_rows"
+	if jsonx.S(a.M("results"), "csv") == "" {
+		def = "status_file"
+	}
+	return Done{Type: jsonx.SOr(d, "type", def), Path: jsonx.S(d, "path"), Field: jsonx.S(d, "field"),
+		Success: jsonx.Strings(d["success"]), Failure: jsonx.Strings(d["failure"])}
+}
+
+// TransferItem 은 Beetle 데이터 이관 한 건이다. 워크로드 하나가 폴더 여럿을 가질 수 있다 (예: 패키지 + 배포 디렉토리).
+//
+//	From · To  소스 · 타겟 경로. {backup_out} · {package_dir} 를 쓸 수 있다
+//	Exclude    rsync 제외 목록 — source · destination 양쪽 필터에 같이 넣는다 (relay 의 push 는 destination 필터만 쓴다)
+//	Delete     타겟에 소스에 없는 파일을 지운다
+//	Fresh      타겟이 비어 있어야 하고, 다시 보낼 때 앞선 시도의 폴더를 옆으로 옮긴다
+//	Verify     옮긴 뒤 checksums.sha256 · package-files.tsv 로 대조한다
+type TransferItem struct {
+	From, To              string
+	Exclude               []string
+	Delete, Fresh, Verify bool
+}
+
+// TransferItems 는 어댑터의 transfer 목록이다. 없으면 패키지 폴더 하나 (backup_out → package_dir, 대조 포함).
+func (a *Adapter) TransferItems() []TransferItem {
+	list := jsonx.AsList(a.Raw["transfer"])
+	if len(list) == 0 {
+		return []TransferItem{{From: "{backup_out}/", To: "{package_dir}", Fresh: true, Verify: true}}
+	}
+	out := make([]TransferItem, 0, len(list))
+	for _, it := range list {
+		m := jsonx.AsM(it)
+		out = append(out, TransferItem{From: jsonx.S(m, "from"), To: jsonx.S(m, "to"), Exclude: jsonx.Strings(m["exclude"]),
+			Delete: jsonx.Truthy(m["delete"]), Fresh: jsonx.Truthy(m["fresh"]), Verify: jsonx.Truthy(m["verify"])})
+	}
+	return out
+}
+
+// GoldenCheck 는 package 단계에서 소스의 LLM 설정(골든 응답의 전제)을 health 로 확인할지다.
+// 기본은 health 주소가 있으면 true, 없으면 false. health 가 LLM 설정을 내보내지 않는 워크로드는 false 로 둔다.
+func (a *Adapter) GoldenCheck() bool {
+	v, ok := a.Raw["golden_check"]
+	if !ok || v == nil {
+		return a.S("health") != ""
+	}
+	return jsonx.Truthy(v)
+}
+
+// PackageMarker 는 소스의 패키지가 다 만들어졌다는 표식 파일이다 (패키지 폴더 안, 기본 checksums.sha256).
+// 있으면 재개 때 backup 을 다시 돌리지 않는다.
+func (a *Adapter) PackageMarker() string {
+	return jsonx.SOr(a.Raw, "package_marker", "checksums.sha256")
+}
+
+// PackageExpect 는 패키지의 package.env 에서 기대하는 값이다 (다르면 경고). 예: {APP_STATUS: included}
+func (a *Adapter) PackageExpect() map[string]string {
+	out := map[string]string{}
+	for k, v := range a.M("package_expect") {
+		out[k] = jsonx.Str(v)
+	}
+	return out
+}
+
+// HealthFields 는 골든 전제(LLM 설정)를 읽을 health 응답의 필드 이름이다.
+func (a *Adapter) HealthFields() (temp, seed string) {
+	h := a.M("health_fields")
+	return jsonx.SOr(h, "temperature", "llm_temperature"), jsonx.SOr(h, "seed", "llm_seed")
 }
 
 // S 는 어댑터 값을 문자열로.
@@ -446,7 +574,7 @@ func NewCase(path string, r jsonx.M, envOrder []string) (*Case, error) {
 	if err := enum(setDefault(pol, "gpu", "same-model-first"), []string{"same-model-first", "vram-at-least"}, "policy.gpu"); err != nil {
 		return nil, err
 	}
-	setDefault(pol, "image", "ubuntu-24.04")
+	setDefault(pol, "image", "source")      // 소스와 같은 OS · 버전. 바꾸려면 'ubuntu-24.04' 처럼 적는다 (keep = Beetle 추천 그대로)
 	setDefault(pol, "driver_series", "595") // 워크로드 bootstrap 의 NVIDIA_DRIVER_SERIES 와 같게
 	setDefault(pol, "root_disk_gb", 100)
 	setDefault(pol, "open_ports", []any{})
@@ -468,8 +596,11 @@ func NewCase(path string, r jsonx.M, envOrder []string) (*Case, error) {
 	}
 	run := jsonx.AsM(setDefault(r, "run", jsonx.M{}))
 	setDefault(run, "env", jsonx.M{})
-	setDefault(run, "golden", true)
-	setDefault(run, "rebuild_before_backup", true)
+	setDefault(run, "golden", false)                // 골든 응답이 있는 워크로드만 사례에서 켠다
+	setDefault(run, "rebuild_before_backup", false) // 켜면 backup 전에 소스를 재기동한다 (기본은 소스를 건드리지 않음)
+	if err := enum(setDefault(run, "on_existing", "stop"), []string{"stop", "clean"}, "run.on_existing"); err != nil {
+		return nil, err
+	}
 	if err := enum(setDefault(r, "cleanup", "suspend"), []string{"suspend", "terminate", "keep"}, "cleanup"); err != nil {
 		return nil, err
 	}
