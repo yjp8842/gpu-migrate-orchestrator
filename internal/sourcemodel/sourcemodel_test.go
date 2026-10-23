@@ -73,7 +73,7 @@ func TestShapeMatchesBeetle(t *testing.T) {
 		t.Fatalf("이미지 이름이 OS 자리에 들어갔거나 빈 배열이 null 로 나간다: %s", b)
 	}
 	g := n.GpuCards[0]
-	if len(n.GpuCards) != 1 || g != (GPU{"0", "NVIDIA", "NVIDIA T4", "GPU", 17, "595"}) {
+	if len(n.GpuCards) != 1 || g != (GPU{"0", "NVIDIA", "NVIDIA T4", "GPU", 16, "595"}) {
 		t.Fatal(g)
 	}
 	if !strings.Contains(string(b), `"driverIndex":"0"`) {
@@ -100,5 +100,13 @@ func TestPlaceholder(t *testing.T) {
 	n := Placeholder("595", open80).Nodes[0]
 	if n.OS.ID != "ubuntu" || n.OS.VersionID != "24.04" || len(n.FirewallTable) != 2 || n.FirewallTable[1].DstPorts != "80" || n.GpuCards[0].DriverIndex != "0" {
 		t.Fatal(n)
+	}
+}
+
+func TestStandardVramGB(t *testing.T) {
+	for in, want := range map[float64]float64{17: 16, 16: 16, 22.49: 24, 24: 24, 46: 48, 80: 80, 103: 103, 0: 0} {
+		if got := StandardVramGB(in); got != want {
+			t.Errorf("StandardVramGB(%v) = %v, want %v", in, got, want)
+		}
 	}
 }

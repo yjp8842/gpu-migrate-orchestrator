@@ -1,0 +1,40 @@
+# 테스트 4-B — AWS→AWS, WidgetRAG Shell(A→A). 타겟 사양을 정하지 않고 Beetle 추천 · 생성으로 만든다.
+# 테스트 4(aws-to-aws-widgetrag-a)와 소스 · 이관 · 기동 · 판정은 같고, 추천 · 생성 경로만 다르다.
+case: aws-to-aws-widgetrag-a-beetle
+workload: widgetrag-a
+source:
+  tumblebug: default
+  ns: default
+  infra: widgetrag-src-aws            # MapUI 로 먼저 만든 소스 (Running · 데이터 적재 끝). 10/22 기존 widgetrag-shell-aws 는 Terminated
+target:
+  provider: beetle                    # Beetle 추천 → 정책 선택 · 보정 → Beetle 생성
+  tumblebug: default                  # Beetle 이 만든 인프라가 사는 Tumblebug (settings 이름) — 기동 · 키 조회에 쓴다
+  csp: aws
+  region: ap-northeast-2
+  zone: null
+  ns: default
+  name: wr-aws-bt                     # Beetle nameSeed
+  spec: null                          # 비워 둔다 — Beetle 추천으로 정한다
+  image: null
+policy:
+  gpu: same-model-first               # 같은 리전이라 T4(g4dn) 후보가 있으면 그것
+  image: ubuntu-24.04                 # 추천 이미지가 24.04 이고 드라이버가 driver_series 와 같으면 그대로, 아니면 기본 24.04 로 바꾼다
+  driver_series: "595"                # 소스에 설치된 드라이버 시리즈 (WidgetRAG 가 고정 설치)
+  root_disk_gb: 100
+  open_ports:
+    - { port: 80, cidr: "${GMP_WEB_ALLOW_CIDR}" }   # 사무실 공인 IP/32 같은 출발지 — 공인 IP 로 화면 확인용 (결정 필요: 개방 범위)
+  on_perf_fail: stop
+transfer:
+  method: beetle                      # Beetle 데이터 이관 (소스 → 타겟 rsync) — 유일한 이관 경로
+  strategy: direct                    # 소스 → 타겟 22 직접 (막히면 relay)
+run:
+  env:
+    LLM_TEMPERATURE: "0"
+    LLM_SEED: "42"
+    COMPARE: "1"
+    CODE_SOURCE: package              # 트리가 없으면 멈춘다 (auto 면 조용히 clone 으로 빠진다)
+    VERIFY_ADMIN_PASSWORD: "${GMP_VERIFY_ADMIN_PASSWORD}"   # 타겟 검증 로그인 — 소스 WidgetRAG 관리자 비밀번호와 같은 값
+  golden: true
+  rebuild_before_backup: true
+  timeout_start_min: 75
+cleanup: suspend

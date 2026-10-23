@@ -182,10 +182,22 @@ func gpuCards(spec M, driverSeries string) []GPU {
 	}
 	for i := 0; i < n; i++ {
 		cards = append(cards, GPU{DriverIndex: strconv.Itoa(i), Vendor: vendor, Model: model,
-			Type: strings.ToUpper(jsonx.SOr(spec, "acceleratorType", "gpu")), MemoryTotalGB: jsonx.F(spec["acceleratorMemoryGB"]),
+			Type: strings.ToUpper(jsonx.SOr(spec, "acceleratorType", "gpu")), MemoryTotalGB: StandardVramGB(jsonx.F(spec["acceleratorMemoryGB"])),
 			DriverVersion: driverSeries})
 	}
 	return cards
+}
+
+// StandardVramGB 는 GPU 메모리를 표준 등급으로 맞춘다 (Beetle 수집기 snapToStandardVramGB 와 같은 규칙, ±2.5GB).
+// Tumblebug 사양은 T4 를 17GB 로 적는데, 이 값을 그대로 보내면 Beetle 추천의 VRAM 필터(>=)에서
+// 같은 칩(g4dn)이 후보에서 빠진다 (2026-10-23 확인 — 16 으로 보내면 g4dn 이 첫 후보).
+func StandardVramGB(gb float64) float64 {
+	for _, tier := range []float64{8, 16, 24, 32, 40, 48, 80, 96, 144, 192, 288} {
+		if math.Abs(tier-gb) <= 2.5 {
+			return tier
+		}
+	}
+	return math.Round(gb)
 }
 
 func osOf(image M) OS {
