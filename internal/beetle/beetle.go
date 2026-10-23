@@ -4,6 +4,10 @@
 //   - 데이터 이관 GET /migration/data/encryptionKey → POST /migration/data → GET /request/{reqId}
 //   - 긴 호출은 Prefer: respond-async 로 시작하고 상태를 폴링한다.
 //   - dry-run 은 조회만 한다. 추천은 POST 지만 조회이고, 암호화 키 발급은 GET 이지만 일회용 키를 만든다.
+//   - 거절 응답 (v0.6.2 배포본에서 확인): 전역 호출 한도 초과는 429 + Retry-After(3초), 비동기 작업 초과 ·
+//     Tumblebug 호출 대기 초과는 503 + Retry-After. 둘 다 서버가 받지 않은 요청이라 Retry-After 만큼 쉬고 다시 보낸다.
+//     단 동기 생성(MigrateInfra)의 503 은 생성 도중에 날 수 있어 다시 보내지 않는다 — 호출하는 쪽이 nameSeed 로 찾아 이어 간다.
+//   - 같은 X-Request-Id 를 다시 쓰면 409 ("already in use") — 이미 받은 요청이라는 뜻이다.
 package beetle
 
 import (
@@ -17,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -94,13 +99,15 @@ func New(ep config.Endpoint, log *logx.Log, dryRun bool) *Client {
 
 // Opts 는 요청 하나의 선택지다.
 type Opts struct {
-	Params   url.Values
-	Body     any
-	Headers  map[string]string
-	Timeout  time.Duration
-	NoRetry  bool
-	Allow404 bool
-	Write    *bool
+	Params  url.Values
+	Body    any
+	Headers map[string]string
+	Timeout time.Duration
+	NoRetry bool
+	// RetryBusy 는 503(+Retry-After)을 받지 않은 요청으로 보고 다시 보낸다 — 비동기 시작 요청처럼 서버가 일을 시작하기 전에만 503 을 주는 호출.
+	RetryBusy bool
+	Allow404  bool
+	Write     *bool
 }
 
 func boolp(b bool) *bool { return &b }
@@ -180,12 +187,16 @@ func (c *Client) Req(method, path string, o Opts) (any, error) {
 		c.Log.HTTP(method, u, resp.StatusCode, time.Since(t0), o.Body, "")
 		st := resp.StatusCode
 		text := string(body)
-		if st == 429 || (st >= 500 && method == "GET" && retry) {
+		if st == 429 || (st == 503 && o.RetryBusy) || (st >= 500 && method == "GET" && retry) {
 			attempt++
 			if attempt > 10 {
 				return nil, &Error{Msg: fmt.Sprintf("%s %s: %d 가 계속됩니다", method, path, st), Status: st, Body: textx.Head(text, 300)}
 			}
-			backoff()
+			if ra := RetryAfter(resp.Header.Get("Retry-After")); ra > 0 {
+				c.Sleep(ra + time.Duration(mrand.Float64()*float64(time.Second)))
+			} else {
+				backoff()
+			}
 			continue
 		}
 		if o.Allow404 && st == 404 {
@@ -203,6 +214,24 @@ func (c *Client) Req(method, path string, o Opts) (any, error) {
 		}
 		return v, nil
 	}
+}
+
+// RetryAfter 는 Retry-After 헤더(초)를 기간으로 (없거나 이상하면 0). 너무 길게 묶이지 않게 60초로 자른다.
+func RetryAfter(h string) time.Duration {
+	n, err := strconv.Atoi(strings.TrimSpace(h))
+	if err != nil || n <= 0 {
+		return 0
+	}
+	if n > 60 {
+		n = 60
+	}
+	return time.Duration(n) * time.Second
+}
+
+// IsDuplicateRequest 는 같은 X-Request-Id 로 다시 보내 409 를 받은 경우다 — 그 요청은 이미 서버에 있다.
+func IsDuplicateRequest(err error) bool {
+	var e *Error
+	return errors.As(err, &e) && e.Status == 409 && strings.Contains(strings.ToLower(e.Body), "already in use")
 }
 
 func (c *Client) data(method, path string, o Opts) (any, error) {
@@ -246,6 +275,15 @@ func (c *Client) MigrateInfra(ns string, body M, nameSeed string, useExisting bo
 		return m, nil
 	}
 	return M{}, nil
+}
+
+// ListInfraIDs 는 Beetle 이 이 ns 에 만든 인프라 ID 목록이다 (GET …/infra?option=id → data.idList).
+func (c *Client) ListInfraIDs(ns string) ([]string, error) {
+	d, err := c.data("GET", "/migration/ns/"+ns+"/infra", Opts{Params: url.Values{"option": {"id"}}, Timeout: 60 * time.Second})
+	if err != nil {
+		return nil, err
+	}
+	return jsonx.Strings(jsonx.AsM(d)["idList"]), nil
 }
 
 // GetInfra 는 Beetle 이 아는 인프라 (없으면 nil).
@@ -319,9 +357,15 @@ func (c *Client) EncryptionKey() (M, error) {
 }
 
 // DataMigration 은 비동기(Prefer: respond-async)로 시작한다. 요청 ID 는 우리가 정해 state 에 먼저 적는다.
+// 503(작업 초과)은 시작 전 거절이라 Retry-After 뒤 다시 보낸다. 409(같은 ID)는 앞서 보낸 요청이 이미 받아들여진 것이라
+// 오류로 보지 않는다 — 호출하는 쪽은 그 ID 로 상태를 이어서 본다.
 func (c *Client) DataMigration(body M, xreq string) (string, error) {
-	d, err := c.data("POST", "/migration/data", Opts{Body: body, Timeout: 120 * time.Second, NoRetry: true,
+	d, err := c.data("POST", "/migration/data", Opts{Body: body, Timeout: 120 * time.Second, NoRetry: true, RetryBusy: true,
 		Headers: map[string]string{"Prefer": "respond-async", "X-Request-Id": xreq}})
+	if IsDuplicateRequest(err) {
+		c.Log.Info("beetle", "요청 %s 는 이미 Beetle 에 있습니다(409) — 상태를 이어서 봅니다", xreq)
+		return xreq, nil
+	}
 	if err != nil {
 		return "", err
 	}

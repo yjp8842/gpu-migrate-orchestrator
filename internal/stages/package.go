@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -102,7 +103,12 @@ func inspectSource(ctx *Context, node M) (bool, string, M, error) {
 	}
 	ctx.Log.Info(stPackage, "소스 상태: GPU %s · 드라이버 %s · 서비스 active %d/%d · 커밋 %s",
 		jsonx.SOr(gpu, "model", "없음"), jsonx.SOr(gpu, "driverVersion", "-"), active, len(units), jsonx.S(ident, "code_ref"))
-	bad, why := inspect.LLMMismatch(jsonx.AsM(ident["health"]), ctx.Case.EnvValue("LLM_TEMPERATURE"), ctx.Case.EnvValue("LLM_SEED"))
+	if !ctx.Adapter.GoldenCheck() {
+		ctx.Log.Info(stPackage, "골든 전제(LLM 설정) 확인 안 함 — 어댑터 golden_check: false")
+		return false, "확인 안 함", ident, nil
+	}
+	tf, sf := ctx.Adapter.HealthFields()
+	bad, why := inspect.LLMMismatchFields(jsonx.AsM(ident["health"]), tf, sf, ctx.Case.EnvValue("LLM_TEMPERATURE"), ctx.Case.EnvValue("LLM_SEED"))
 	return bad, why, ident, nil
 }
 
@@ -254,8 +260,8 @@ func runPackage(ctx *Context) (M, error) {
 	if err != nil {
 		return nil, err
 	}
-	manifest := textx.RemotePath(outDir + "/MANIFEST.txt")
-	r, err := ctx.Exec("source", "test -f "+manifest, 2)
+	marker := textx.RemotePath(outDir + "/" + ad.PackageMarker()) // 패키지가 다 만들어졌다는 표식 (어댑터 package_marker)
+	r, err := ctx.Exec("source", "test -f "+marker, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +280,7 @@ func runPackage(ctx *Context) (M, error) {
 				return nil, err
 			}
 		}
-		ctx.Log.Info(stPackage, "backup → %s (GOLDEN=%s 이면 골든 질문에 수 분)", outDir, golden)
+		ctx.Log.Info(stPackage, "backup → %s (golden=%s)", outDir, golden)
 		// backup 은 비어 있지 않은 출력 폴더를 거부하므로, 앞선 시도가 남긴 폴더는 옆으로 옮기고 다시 보낸다
 		moveOut := func(try int) error { return moveAside(ctx, stPackage, "source", outDir, try) }
 		if _, err := runRemote(ctx, "backup", backupCmd, pkgMin, moveOut); err != nil {
@@ -282,10 +288,16 @@ func runPackage(ctx *Context) (M, error) {
 		}
 	}
 	env := map[string]string{}
-	for _, name := range []string{"MANIFEST.txt", "package.env", "package-files.tsv", "checksums.sha256"} {
+	// checksums.sha256 은 인터페이스(이관 뒤 대조)라 꼭 있어야 하고, 나머지는 있는 워크로드만 증적으로 받는다.
+	for _, name := range []string{"checksums.sha256", "MANIFEST.txt", "package.env", "package-files.tsv"} {
 		text, ok, err := ctx.ReadText("source", outDir+"/"+name)
-		if err != nil || !ok {
-			ctx.Log.Warn(stPackage, "%s 가져오기 실패: %v", name, errOr(err, "파일 없음"))
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			if name == "checksums.sha256" {
+				return nil, Errf("패키지 %s 에 checksums.sha256 이 없습니다 — 워크로드 backup 이 체크섬을 남겨야 이관 뒤 대조할 수 있습니다", outDir)
+			}
 			continue
 		}
 		if _, err := ctx.WriteText(stPackage, name, text); err != nil {
@@ -305,12 +317,15 @@ func runPackage(ctx *Context) (M, error) {
 		}
 		return "?"
 	}
-	app := or("APP_STATUS")
-	if ad.S("form") == "shell" && app != "included" {
-		ctx.Log.Warn(stPackage, "패키지에 실행 파일 층이 없습니다 (APP_STATUS=%s) — 소스가 이전 코드면 최신 브랜치로 다시 띄워야 한다", app)
+	// 어댑터 package_expect 의 값과 다르면 경고만 한다 (예: 실행 파일 층이 패키지에 들어 있어야 하는 워크로드 APP_STATUS=included)
+	expect := ad.PackageExpect()
+	for _, k := range sortedKeys(expect) {
+		if got := or(k); got != expect[k] {
+			ctx.Log.Warn(stPackage, "패키지 package.env 의 %s=%s (기대 %s)", k, got, expect[k])
+		}
 	}
-	ctx.Log.Info(stPackage, "패키지 %s: 파일 %s개 · 기준선 %s · 골든 %s · 실행 파일 층 %s", outDir, or("PACKAGE_FILES_COUNT"), or("BASELINE_STATUS"), or("GOLDEN_STATUS"), app)
-	return M{"backup_out": outDir, "app_status": app, "files": env["PACKAGE_FILES_COUNT"], "code_ref": ident["code_ref"]}, nil
+	ctx.Log.Info(stPackage, "패키지 %s 준비됨 (package.env 키 %d개)", outDir, len(env))
+	return M{"backup_out": outDir, "package_env": env, "code_ref": ident["code_ref"]}, nil
 }
 
 func errOr(err error, def string) string {
@@ -318,4 +333,13 @@ func errOr(err error, def string) string {
 		return err.Error()
 	}
 	return def
+}
+
+func sortedKeys(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

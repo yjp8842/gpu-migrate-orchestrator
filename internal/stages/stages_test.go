@@ -121,15 +121,28 @@ type fakeBeetle struct {
 	sent       []string
 	sendStatus string
 	reqs       map[string]M
+	bodies     []M
+	// 생성 — 받은 nameSeed · useExisting, 목록 · 삭제
+	seed    string
+	use     *bool
+	ids     []string
+	deleted []string
 }
 
 func (b *fakeBeetle) RecommendInfra(req M, limit int) ([]any, error) { b.called++; return b.cands, nil }
 func (b *fakeBeetle) MigrateInfra(ns string, body M, seed string, use bool, to time.Duration) (M, error) {
+	b.seed, b.use = seed, &use
 	return b.migrate, nil
+}
+func (b *fakeBeetle) ListInfraIDs(ns string) ([]string, error) { return b.ids, nil }
+func (b *fakeBeetle) DeleteInfra(ns, id string) (any, error) {
+	b.deleted = append(b.deleted, id)
+	return M{}, nil
 }
 func (b *fakeBeetle) EncryptionKey() (M, error) { return M{"keyId": "k1", "publicKey": b.pub}, nil }
 func (b *fakeBeetle) DataMigration(body M, xreq string) (string, error) {
 	b.sent = append(b.sent, xreq)
+	b.bodies = append(b.bodies, body)
 	st := b.sendStatus
 	if st == "" {
 		st = "success"
@@ -323,13 +336,44 @@ func TestOpenPortsSkipAndAdd(t *testing.T) {
 }
 
 func TestProvisionBeetleMissingInfraID(t *testing.T) {
-	ctx := newCtx(t, &fakeTB{}, &fakeBeetle{migrate: M{"status": "Creating"}}, false)
+	fb := &fakeBeetle{migrate: M{"status": "Creating"}}
+	ctx := newCtx(t, &fakeTB{}, fb, false)
 	ctx.WriteJSON("recommend", "migrate-request.json", M{"targetInfra": M{}})
 	if _, err := runProvision(ctx); err == nil || !strings.Contains(err.Error(), "Creating") {
 		t.Fatal(err)
 	}
-	if !ctx.State.HasKey("beetle_migrate_started") {
+	if !ctx.State.HasKey("beetle_migrate_started") || ctx.State.KeyS("beetle_name_seed") == "" {
 		t.Fatal("부작용 전에 기록하지 않았다")
+	}
+	if fb.use == nil || *fb.use || fb.seed != ctx.State.KeyS("beetle_name_seed") || !strings.HasPrefix(fb.seed, "wr-gcp-") {
+		t.Fatalf("useExisting=false · run 별 nameSeed 로 보내지 않았다: %v %q", fb.use, fb.seed)
+	}
+}
+
+func TestNameSeed(t *testing.T) {
+	if s := NameSeed("wr-gcp", "20261023-101530"); s != "wr-gcp-10231015" {
+		t.Fatal(s)
+	}
+	s := NameSeed("Very_Long Target.Name-For-Test", "20261023-101530-4242")
+	if len(s) > 20 || !strings.HasSuffix(s, "-10231015") || strings.ContainsAny(s, "_. ") || s[0] == '-' {
+		t.Fatal(s)
+	}
+	if s := NameSeed("___", "20261023-101530"); s != "gmp-10231015" {
+		t.Fatal(s)
+	}
+}
+
+func TestFindSeededResumesBeetleCreate(t *testing.T) {
+	fb := &fakeBeetle{ids: []string{"other-infra101", "wr-gcp-10231015-infra101"}}
+	if id, err := findSeeded(fb, "default", "wr-gcp-10231015"); err != nil || id != "wr-gcp-10231015-infra101" {
+		t.Fatal(id, err)
+	}
+	fb.ids = append(fb.ids, "wr-gcp-10231015-infra102")
+	if _, err := findSeeded(fb, "default", "wr-gcp-10231015"); err == nil {
+		t.Fatal("둘 이상을 골랐다")
+	}
+	if id, _ := findSeeded(&fakeBeetle{ids: []string{"wr-gcp-1023101500"}}, "default", "wr-gcp-10231015"); id != "" {
+		t.Fatal("접두어만 같은 다른 seed 를 골랐다", id)
 	}
 }
 
@@ -439,7 +483,7 @@ func TestBeetleBodyEncryptsKeys(t *testing.T) {
 	if !strings.Contains(jsonx.S(jsonx.AsM(body["source"]), "preCmd"), "gmp-x-data-2") || !strings.Contains(jsonx.S(jsonx.AsM(body["destination"]), "postCmd"), "gmp-x-data-2") {
 		t.Fatal("훅 표식에 요청 ID 가 없다:", string(raw))
 	}
-	if jsonx.S(jsonx.AsM(body["source"]), "path") != "~/widgetrag-backup/20261022/" || body["encryptionKeyId"] != "k1" ||
+	if jsonx.S(jsonx.AsM(body["source"]), "path") != "/home/cb-user/widgetrag-backup/20261022/" || body["encryptionKeyId"] != "k1" ||
 		jsonx.S(jsonx.AsM(jsonx.Get(body, "destination", "filesystem", "ssh")), "host") != "203.0.113.5" {
 		t.Fatal(string(raw))
 	}
