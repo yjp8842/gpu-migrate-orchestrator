@@ -1,7 +1,8 @@
 # 사례 샘플 — 복사해서 쓴다: cp cases/case.sample.yaml cases/<사례 이름>.yaml
 #
 # 값이 비어 있는 줄(「채움」)은 이관 조합마다 바꾸는 값이라 꼭 채운다 — 비워 두면 실행이 그 이름을 대며 멈춘다.
-# 값이 들어 있는 줄은 기본값이다. 바꿀 일이 없으면 그대로 두고, 줄을 지워도 같은 기본값으로 돈다.
+# 값이 들어 있는 줄은 WidgetRAG 기준으로 채운 값이다. 바꿀 일이 없으면 그대로 둔다.
+# 「도구 기본값과 다름」 표시가 있는 줄은 지우면 도구 기본값으로 바뀌어 WidgetRAG 판정이 달라진다 (지우지 않는다).
 # ${이름} 은 셸 환경변수 또는 .env 에서 채운다 (.env.example 참고).
 
 case:                                 # 채움 — 파일 이름과 같게. 예) aws-to-gcp-widgetrag-a  (<소스>-to-<타겟>-<워크로드>)
@@ -19,16 +20,16 @@ target:
   region:                             # 채움 — CSP 리전 이름. 예) ap-northeast-2 (AWS 서울) | asia-northeast3 (GCP 서울)
   zone: null                          # null 이면 Auto (고정하면 VPC 한도에 걸릴 수 있다)
   ns: default                         # 비우면 source.ns
-  name:                               # 채움 — beetle: nameSeed (예: wr-gcp) | tumblebug: 인프라 이름 (예: wr-aws-tgt-01)
+  name:                               # 채움 — beetle: nameSeed 앞부분, run 마다 뒤에 시각이 붙는다 (예: wr-gcp → wr-gcp-10231418) | tumblebug: 인프라 이름 (예: wr-aws-tgt-01)
   spec: null                          # provider=tumblebug 일 때만 채움 — Tumblebug specId. 예) aws+ap-northeast-2+g4dn.xlarge
   image: null                         # provider=tumblebug 에서 이미지를 고정할 때만 — Tumblebug 이미지 ID. 예) ami-0d222b26b6fb4eeed
 
 policy:
   gpu: same-model-first               # same-model-first: 같은 칩 우선, 없으면 VRAM 이상 중 가장 가까운 것 | vram-at-least
-  image: ubuntu-24.04                 # 추천 이미지가 이 OS 이고 드라이버가 driver_series 면 그대로, 아니면 기본 이미지로 바꾼다 | keep
+  image: ubuntu-24.04                 # 도구 기본값과 다름(source = 소스와 같은 OS · 버전) — 추천 이미지가 이 OS 이고 드라이버가 driver_series 면 그대로, 아니면 기본 이미지로 바꾼다 | keep
   driver_series: "595"                # 워크로드가 설치하는 NVIDIA 드라이버 시리즈
   root_disk_gb: 100
-  open_ports:                         # 타겟에 더 열 포트 — 비우면 [] (22 는 Beetle · Tumblebug 가 연다)
+  open_ports:                         # 타겟에 더 열 포트 — 비우면 [] (22 는 Beetle · Tumblebug 가 연다). WidgetRAG 80 · LexAI 네이티브 3000
     - { port: 80, cidr: "${GMP_WEB_ALLOW_CIDR}" }
   on_perf_fail: stop
 
@@ -37,14 +38,15 @@ transfer:
   strategy: direct                    # direct: 소스 → 타겟 22 직접 | relay: Beetle 을 거친다 (직접이 막힐 때)
 
 run:
-  env:                                # 타겟 진입 한 줄 앞에 붙는 환경값 — WidgetRAG 기준
+  env:                                # 타겟 진입 한 줄 앞에 붙는 환경값 — WidgetRAG 기준 (LexAI 는 {})
     LLM_TEMPERATURE: "0"              # 골든 응답 비교의 전제 (소스와 같은 값)
     LLM_SEED: "42"
     COMPARE: "1"                      # 이관 동등성 비교 켬
     CODE_SOURCE: package              # 패키지 트리로만 기동 (auto 면 트리가 없을 때 조용히 clone 으로 빠진다)
     VERIFY_ADMIN_PASSWORD: "${GMP_VERIFY_ADMIN_PASSWORD}"
-  golden: true                        # 소스 패키지에 골든 응답을 넣고 타겟에서 대조
-  rebuild_before_backup: true         # 패키지 전에 소스를 LLM 설정으로 다시 띄운다
+  golden: true                        # 도구 기본값과 다름(false) — 소스 패키지에 골든 응답을 넣고 타겟에서 대조 (WidgetRAG 테스트2 의 기준)
+  rebuild_before_backup: true         # 도구 기본값과 다름(false) — 패키지 전에 소스를 LLM 설정으로 다시 띄운다 (골든 전제)
   timeout_start_min: 75               # 타겟 기동 → 검증 제한 시간 (지우면 settings.yaml 의 start_min)
+  on_existing: stop                   # 타겟에 기존 설치가 있으면: stop(멈춤) | clean(어댑터 existing_env 를 붙여 지우고 진행)
 
-cleanup: suspend                      # 판정 뒤 타겟: suspend | terminate (gmp.run 라벨이 있을 때만) | keep
+cleanup: suspend                      # 판정 뒤 타겟: suspend | terminate (Beetle 생성은 Beetle 삭제 API, Tumblebug 생성은 gmp.run 라벨이 있을 때만) | keep

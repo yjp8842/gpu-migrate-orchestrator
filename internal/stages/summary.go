@@ -40,7 +40,7 @@ func Summarize(c *config.Case, rs *state.RunState) error {
 		lines = append(lines, fmt.Sprintf("- %s — %s", jsonx.S(v, "result"), jsonx.S(v, "summary")))
 		if m := jsonx.AsM(v["metrics"]); len(m) > 0 {
 			var parts []string
-			for _, k := range []string{"pass", "fail", "cold_sec", "p50_sec", "p95_sec", "sources", "os_docs", "db_msgs"} {
+			for _, k := range jsonx.SortedKeys(m) { // 워크로드가 결과표에 남긴 수치를 그대로
 				if s := jsonx.S(m, k); s != "" {
 					parts = append(parts, k+"="+s)
 				}
@@ -53,11 +53,14 @@ func Summarize(c *config.Case, rs *state.RunState) error {
 		for _, f := range jsonx.Strings(jsonx.Get(v, "compare", "fail_items")) {
 			lines = append(lines, "- FAIL "+f)
 		}
+		for _, f := range jsonx.Strings(v["status_fail"]) {
+			lines = append(lines, "- FAIL 상태 "+f)
+		}
 	} else {
 		lines = append(lines, "- (없음)")
 	}
 	lines = append(lines, "", "## 자원 · 키", "")
-	for _, k := range []string{"target_infra_id", "backup_out", "sg_rules_added", "xreq_backup", "xreq_rebuild", "start_outcome", "beetle_data_req", "beetle_hooks"} {
+	for _, k := range []string{"target_infra_id", "backup_out", "sg_rules_added", "xreq_backup", "xreq_rebuild", "start_outcome", "beetle_name_seed", "beetle_data_req", "beetle_data_req_2", "beetle_data_req_3", "beetle_hooks", "source_restored", "staging_left", "status_only"} {
 		if val, ok := st.Keys[k]; ok {
 			b, _ := jsonx.Marshal(val, false)
 			lines = append(lines, fmt.Sprintf("- %s: %s", k, string(b)))

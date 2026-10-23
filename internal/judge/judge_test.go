@@ -51,3 +51,15 @@ func TestRequireCompareWithoutRows(t *testing.T) {
 		t.Fatal(v)
 	}
 }
+
+func TestEvaluateColumns(t *testing.T) {
+	cols := Columns{Result: "outcome", Pass: "OK", Fail: "errors", Timestamp: "run_at"}
+	v := EvaluateColumns("run_at,outcome,errors\n1,OK,0\n2,OK,3\n", 1, "", false, cols)
+	if v["result"] != "FAIL" || v["timestamp"] != "2" {
+		t.Fatal("오류 열이 0 이 아닌데 PASS", v)
+	}
+	v = EvaluateColumns("run_at,outcome\n1,OK\n", 0, "", false, Columns{Result: "outcome", Pass: "OK", Timestamp: "run_at"})
+	if v["result"] != "PASS" {
+		t.Fatal("오류 열이 없는 결과표를 PASS 로 보지 않았다", v)
+	}
+}

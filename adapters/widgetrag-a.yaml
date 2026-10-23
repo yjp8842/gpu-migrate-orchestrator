@@ -19,6 +19,9 @@ results:
 logs:
   run: "~/tc-run.log"            # 분리 실행한 진입 한 줄의 출력
   exit: "~/tc-run.exit"          # 진입 한 줄의 종료 코드 (재부팅 전 구간)
+proc_pattern: "scripts/local/bootstrap.sh"   # 기동 중인 진입 한 줄을 찾는 pgrep -f 패턴 (이미 돌면 다시 띄우지 않는다)
+package_marker: MANIFEST.txt     # package.sh backup 이 마지막에 쓰는 파일 — 있으면 재개 때 backup 을 건너뛴다
+package_expect: { APP_STATUS: included }   # 실행 파일 층이 패키지에 있어야 한다 (다르면 경고)
 resume_unit: widgetrag-bootstrap-resume
 # 판정 단계가 타겟에서 받아 run 폴더 verify/target/ 에 두는 것 — 판정과 무관하게 받는다 (테스트 이력)
 diagnostics:
@@ -33,5 +36,8 @@ identify:                        # 식별 대조표의 소스 쪽 — package �
   env_file: /etc/widgetrag/widgetrag.env          # 키 목록만 읽는다 (값에 비밀값)
   config: /etc/widgetrag/application-local.yaml
   tree: ~/WidgetRAG
+  code_ref: "git -C ~/WidgetRAG rev-parse --short HEAD 2>/dev/null || grep APP_CODE_REF ~/WidgetRAG/app-tree.env 2>/dev/null | cut -d= -f2 || echo unknown"
+  packages: [openjdk-17-jdk, nginx, opensearch, python3.12, nvidia-container-toolkit]
+  versions: ["ollama -v"]
 ports: { web: 80, backend: 8080, ai: 8000, ollama: 11434, opensearch: 9200 }
 health: "http://127.0.0.1:8000/health"           # llm_temperature · llm_seed 로 골든 전제 확인

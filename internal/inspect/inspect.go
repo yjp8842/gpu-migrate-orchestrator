@@ -48,23 +48,35 @@ func Commands(ad *config.Adapter) []Cmd {
 	if f := jsonx.S(ident, "config"); f != "" {
 		cfgCmd = fmt.Sprintf("cat %s 2>/dev/null || true", f)
 	}
-	health := ad.S("health")
-	if health == "" {
-		health = "http://127.0.0.1:8000/health"
+	healthCmd := "echo '{}'" // health 주소가 없는 워크로드
+	if health := ad.S("health"); health != "" {
+		healthCmd = fmt.Sprintf("curl -s --max-time 5 %s || echo '{}'", health)
+	}
+	// 버전을 남길 패키지(dpkg 이름)와 버전 명령은 워크로드마다 다르다 — identify.packages · identify.versions.
+	// GPU 드라이버 패키지는 공통으로 남긴다.
+	pkgCmd := `dpkg-query -W -f='${Package}=${Version}\n' 'nvidia-driver-*' 2>/dev/null | grep -v '=$'`
+	if pk := jsonx.Strings(ident["packages"]); len(pk) > 0 {
+		pkgCmd = fmt.Sprintf(`dpkg-query -W -f='${Package}=${Version}\n' %s 2>/dev/null; `, strings.Join(pk, " ")) + pkgCmd
+	}
+	for _, v := range jsonx.Strings(ident["versions"]) {
+		pkgCmd += "; " + v + " 2>/dev/null | tail -1"
+	}
+	codeRef := jsonx.S(ident, "code_ref")
+	if codeRef == "" {
+		codeRef = fmt.Sprintf("git -C %s rev-parse --short HEAD 2>/dev/null || echo unknown", tree)
 	}
 	return []Cmd{
 		{"gpu", "nvidia-smi --query-gpu=index,uuid,name,driver_version,pci.bus_id,memory.total --format=csv,noheader,nounits 2>/dev/null || echo NOGPU"},
 		{"cuda", "nvidia-smi 2>/dev/null | grep -o 'CUDA Version: [0-9.]*' | awk 'NR==1' || true"},
 		{"os", "cat /etc/os-release"},
 		{"kernel", "uname -r"},
-		{"pkgs", `dpkg-query -W -f='${Package}=${Version}\n' openjdk-17-jdk nginx opensearch python3.12 docker-ce nvidia-container-toolkit 2>/dev/null; ` +
-			`dpkg-query -W -f='${Package}=${Version}\n' 'nvidia-driver-*' 2>/dev/null | grep -v '=$'; ollama -v 2>/dev/null | tail -1`},
+		{"pkgs", pkgCmd},
 		{"units", unitCmd},
 		{"env_keys", envCmd},
 		{"config", cfgCmd},
-		{"code_ref", fmt.Sprintf("git -C %s rev-parse --short HEAD 2>/dev/null || grep APP_CODE_REF %s/app-tree.env 2>/dev/null || echo unknown", tree, tree)},
+		{"code_ref", codeRef},
 		{"compose", composeCmd},
-		{"health", fmt.Sprintf("curl -s --max-time 5 %s || echo '{}'", health)},
+		{"health", healthCmd},
 	}
 }
 
@@ -154,7 +166,12 @@ func sameNum(a, b string) bool {
 
 // LLMMismatch 는 (불일치?, 설명). 사례의 LLM_TEMPERATURE · LLM_SEED 와 소스의 /health 값을 비교한다.
 func LLMMismatch(health jsonx.M, wantTemp, wantSeed string) (bool, string) {
-	temp, seed := jsonx.S(health, "llm_temperature"), jsonx.S(health, "llm_seed")
+	return LLMMismatchFields(health, "llm_temperature", "llm_seed", wantTemp, wantSeed)
+}
+
+// LLMMismatchFields 는 health 응답의 필드 이름을 어댑터에서 받는 판이다 (워크로드마다 이름이 다르다).
+func LLMMismatchFields(health jsonx.M, tempField, seedField, wantTemp, wantSeed string) (bool, string) {
+	temp, seed := jsonx.S(health, tempField), jsonx.S(health, seedField)
 	bad := (wantTemp != "" && !sameNum(temp, wantTemp)) || (wantSeed != "" && seed != wantSeed)
 	or := func(s, d string) string {
 		if s == "" {

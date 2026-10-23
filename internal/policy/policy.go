@@ -5,6 +5,7 @@ package policy
 import (
 	"fmt"
 	"math"
+	"net"
 	"regexp"
 	"strings"
 
@@ -190,6 +191,7 @@ func AdjustCandidate(cand M, policy M, imageOverride string, openPorts []M, imag
 			c["targetOsImageList"] = []any{M{"id": imageOverride}}
 		}
 	}
+	changes = append(changes, fixSubnets(jsonx.AsM(c["targetVNet"]))...)
 	for _, p := range openPorts {
 		rule := M{"Ports": jsonx.Str(p["port"]), "Protocol": jsonx.SOr(p, "protocol", "tcp"), "Direction": "inbound", "CIDR": jsonx.S(p, "cidr")}
 		for _, sg := range jsonx.ListM(c["targetSecurityGroupList"]) {
@@ -212,4 +214,47 @@ func AdjustCandidate(cand M, policy M, imageOverride string, openPorts []M, imag
 		}
 	}
 	return c, changes
+}
+
+// fixSubnets 는 서브넷 CIDR 이 vNet CIDR 과 같거나 더 넓으면 vNet 안의 더 좁은 블록(접두 길이 +2, 최대 /28)으로 바꾼다.
+// Beetle 0.6.2 추천은 vNet 과 서브넷을 같은 /16 으로 주는데, Tumblebug 0.13.4 는 서브넷 접두 길이가 vNet 보다 커야 받는다
+// ("subnet CIDR block … is not valid for vNet CIDR block"). 서브넷이 여럿이면 차례로 겹치지 않는 블록을 준다.
+func fixSubnets(vnet M) []string {
+	if vnet == nil {
+		return nil
+	}
+	_, vn, err := net.ParseCIDR(jsonx.S(vnet, "cidrBlock"))
+	if err != nil || vn.IP.To4() == nil {
+		return nil
+	}
+	vp, _ := vn.Mask.Size()
+	np := vp + 2
+	if np > 28 {
+		return nil
+	}
+	var changes []string
+	next := 0
+	for _, sn := range jsonx.ListM(vnet["subnetInfoList"]) {
+		key := "ipv4_CIDR"
+		if _, ok := sn[key]; !ok {
+			key = "ipv4CIDR"
+		}
+		_, cur, err := net.ParseCIDR(jsonx.S(sn, key))
+		if err == nil {
+			if cp, _ := cur.Mask.Size(); cp > vp && vn.Contains(cur.IP) {
+				continue
+			}
+		}
+		if next >= 1<<(np-vp) {
+			break
+		}
+		ip := vn.IP.To4()
+		base := uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
+		base += uint32(next) << (32 - np)
+		block := fmt.Sprintf("%d.%d.%d.%d/%d", byte(base>>24), byte(base>>16), byte(base>>8), byte(base), np)
+		changes = append(changes, fmt.Sprintf("서브넷 %s %s → %s (vNet %s 보다 좁아야 한다)", jsonx.S(sn, "name"), jsonx.S(sn, key), block, jsonx.S(vnet, "cidrBlock")))
+		sn[key] = block
+		next++
+	}
+	return changes
 }

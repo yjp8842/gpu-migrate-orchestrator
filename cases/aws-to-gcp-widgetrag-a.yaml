@@ -12,7 +12,7 @@ target:
   region: asia-northeast3
   zone: null
   ns: default
-  name: wr-gcp                        # Beetle nameSeed
+  name: wr-gcp                        # Beetle nameSeed 앞부분 (run 마다 뒤에 시각이 붙는다)
   spec: null
   image: null
 policy:

@@ -1,6 +1,0 @@
-timestamp,form,source_form,package,test,item,source,target,result,note
-2026-10-22 02:10:31,aws-to-aws-widgetrag-a-target,shell-native,20261022-100000,T1-1,services:count,5,5,PASS,일치
-2026-10-22 02:10:31,aws-to-aws-widgetrag-a-target,shell-native,20261022-100000,T1-3,app:jar,1ac1fac32732,1ac1fac32732,PASS,일치
-2026-10-22 02:10:31,aws-to-aws-widgetrag-a-target,shell-native,20261022-100000,T1-3,runtime:driver,595.99.02,595.99.02,PASS,일치
-2026-10-22 02:10:31,aws-to-aws-widgetrag-a-target,shell-native,20261022-100000,T1-3,runtime:gpu,Tesla T4,NVIDIA L4,WARN,값 다름
-2026-10-22 02:10:31,aws-to-aws-widgetrag-a-target,shell-native,20261022-100000,T2,golden:q1,ab12,ab12,PASS,일치

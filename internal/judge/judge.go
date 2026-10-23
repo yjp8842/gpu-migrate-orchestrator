@@ -49,8 +49,20 @@ func toAny(rows []map[string]string) []any {
 	return out
 }
 
-// Evaluate 는 판정 결과(result · summary · metrics · compare · warn)를 돌려준다.
+// Columns 는 결과표에서 판정에 쓰는 열 이름이다 (워크로드마다 다르면 어댑터 results.columns 로 준다).
+type Columns struct{ Result, Pass, Fail, Timestamp string }
+
+// DefaultColumns 는 result=PASS · fail=0 · timestamp.
+var DefaultColumns = Columns{Result: "result", Pass: "PASS", Fail: "fail", Timestamp: "timestamp"}
+
+// Evaluate 는 기본 열 이름으로 판정한다.
 func Evaluate(resultsText string, baseline int, compareText string, requireCompare bool) jsonx.M {
+	return EvaluateColumns(resultsText, baseline, compareText, requireCompare, DefaultColumns)
+}
+
+// EvaluateColumns 는 판정 결과(result · summary · metrics · compare · warn)를 돌려준다.
+// 이번 회차(baseline 뒤의 마지막 행)의 Result 열이 Pass 값이고 Fail 열(있으면)이 0 이면 PASS.
+func EvaluateColumns(resultsText string, baseline int, compareText string, requireCompare bool, cols Columns) jsonx.M {
 	rows := ParseCSV(resultsText)
 	var newRows []map[string]string
 	if len(rows) > baseline {
@@ -60,24 +72,25 @@ func Evaluate(resultsText string, baseline int, compareText string, requireCompa
 		return jsonx.M{"result": "NO-RESULT", "summary": "검증 결과표에 새 행이 없다 (verify 가 돌지 않았다)", "rows": []any{}}
 	}
 	row := newRows[len(newRows)-1]
-	fails, _ := strconv.Atoi(strings.TrimSpace(row["fail"]))
+	fails := 0
+	if v, ok := row[cols.Fail]; ok && cols.Fail != "" {
+		fails, _ = strconv.Atoi(strings.TrimSpace(v))
+	}
 	result := "FAIL"
-	if row["result"] == "PASS" && fails == 0 {
+	if strings.TrimSpace(row[cols.Result]) == cols.Pass && fails == 0 {
 		result = "PASS"
 	}
-	metrics := jsonx.M{}
-	for _, k := range []string{"pass", "fail", "cold_sec", "p50_sec", "p95_sec", "sources", "os_docs", "db_msgs"} {
-		if v, ok := row[k]; ok {
+	metrics := jsonx.M{} // 이번 회차 행의 판정 열 밖 값 전부 (워크로드가 남긴 수치)
+	for k, v := range row {
+		if k != cols.Result && k != cols.Timestamp {
 			metrics[k] = v
-		} else {
-			metrics[k] = nil
 		}
 	}
 	warn := []any{}
-	verdict := jsonx.M{"timestamp": row["timestamp"], "form": row["form"], "metrics": metrics, "rows": toAny(newRows), "compare": nil}
+	verdict := jsonx.M{"timestamp": row[cols.Timestamp], "form": row["form"], "metrics": metrics, "rows": toAny(newRows), "compare": nil}
 	var cmpRows []map[string]string
 	for _, r := range ParseCSV(compareText) {
-		if r["timestamp"] == row["timestamp"] {
+		if r[cols.Timestamp] == row[cols.Timestamp] {
 			cmpRows = append(cmpRows, r)
 		}
 	}
@@ -123,7 +136,10 @@ func Evaluate(resultsText string, baseline int, compareText string, requireCompa
 	}
 	verdict["result"] = result
 	verdict["warn"] = warn
-	summary := fmt.Sprintf("검증 %s PASS / %s FAIL", row["pass"], row["fail"])
+	summary := fmt.Sprintf("검증 %s=%s", cols.Result, row[cols.Result])
+	if p, ok := row["pass"]; ok {
+		summary = fmt.Sprintf("검증 %s PASS / %s FAIL", p, row[cols.Fail])
+	}
 	if byStr != "" {
 		summary += " · 비교 " + byStr
 	} else {

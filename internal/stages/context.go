@@ -55,6 +55,8 @@ type Tumblebug interface {
 type Beetle interface {
 	RecommendInfra(req M, limit int) ([]any, error)
 	MigrateInfra(ns string, body M, nameSeed string, useExisting bool, timeout time.Duration) (M, error)
+	ListInfraIDs(ns string) ([]string, error)
+	DeleteInfra(ns, id string) (any, error)
 	EncryptionKey() (M, error)
 	DataMigration(body M, xreq string) (string, error)
 	RequestStatus(reqID string) (M, error)
@@ -171,10 +173,15 @@ func (c *Context) SourceEnvStr() string {
 	return config.EnvString(env)
 }
 
-// Remote 는 어댑터의 명령 템플릿을 채운다. repo_raw · branch · env(타겟용) · source_env(소스용)는 자동으로 들어간다.
+// Remote 는 어댑터의 명령 템플릿을 채운다. env(타겟용) · source_env(소스용) · package_dir 와, 어댑터에 있으면 repo_raw · branch 가
+// 자동으로 들어간다 (없는 값을 쓰는 템플릿은 오류).
 func (c *Context) Remote(key string, values map[string]string) (string, error) {
-	base := map[string]string{"repo_raw": c.Adapter.S("repo_raw"), "branch": c.Adapter.S("branch"), "env": c.EnvStr(),
-		"source_env": c.SourceEnvStr()}
+	base := map[string]string{"env": c.EnvStr(), "source_env": c.SourceEnvStr(), "package_dir": c.Adapter.S("package_dir")}
+	for _, k := range []string{"repo_raw", "branch"} {
+		if v := c.Adapter.S(k); v != "" {
+			base[k] = v
+		}
+	}
 	for k, v := range values {
 		base[k] = v
 	}

@@ -13,7 +13,7 @@ target:
   region: ap-northeast-2
   zone: null
   ns: default
-  name: wr-aws-bt                     # Beetle nameSeed
+  name: wr-aws-bt                     # Beetle nameSeed 앞부분 (run 마다 뒤에 시각이 붙는다)
   spec: null                          # 비워 둔다 — Beetle 추천으로 정한다
   image: null
 policy:

@@ -158,7 +158,11 @@ func TestSettingsSecretPasswordRemoved(t *testing.T) {
 }
 
 func TestPlaceholderAdapterMessage(t *testing.T) {
-	_, err := LoadAdapter("lexai-a")
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "adapters"), 0o755)
+	os.WriteFile(filepath.Join(dir, "adapters", "todo-x.yaml"), []byte("todo: \"인터페이스 정렬 뒤에 채운다\"\nworkload: x\n"), 0o644)
+	t.Setenv("GMP_ROOT", dir)
+	_, err := LoadAdapter("todo-x")
 	if err == nil || !strings.Contains(err.Error(), "자리만") {
 		t.Fatalf("err=%v", err)
 	}

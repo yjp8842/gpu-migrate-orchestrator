@@ -1,6 +1,7 @@
 package inspect
 
 import (
+	"strings"
 	"testing"
 
 	"gpu-migrate-orchestrator/internal/config"
@@ -40,5 +41,29 @@ func TestIdentifyParsesOutputs(t *testing.T) {
 	}
 	if jsonx.S(jsonx.AsM(id["health"]), "llm_seed") != "42" || id["code_ref"] != "7fbeb17" || id["os"] != "Ubuntu 24.04.3 LTS" {
 		t.Fatal(id)
+	}
+}
+
+func TestCommandsFollowAdapter(t *testing.T) {
+	cmd := func(ad *config.Adapter, name string) string {
+		for _, c := range Commands(ad) {
+			if c.Name == name {
+				return c.Command
+			}
+		}
+		return ""
+	}
+	bare := &config.Adapter{Raw: jsonx.M{"form": "shell", "workload": "x"}}
+	if h := cmd(bare, "health"); h != "echo '{}'" {
+		t.Fatal("health 가 없는 워크로드에 기본 주소를 붙였다:", h)
+	}
+	if p := cmd(bare, "pkgs"); strings.Contains(p, "opensearch") || strings.Contains(p, "ollama") || !strings.Contains(p, "nvidia-driver-*") {
+		t.Fatal("특정 워크로드의 패키지 목록이 기본으로 들어갔다:", p)
+	}
+	ad := &config.Adapter{Raw: jsonx.M{"health": "http://127.0.0.1:9000/health", "identify": jsonx.M{
+		"packages": []any{"postgresql-16"}, "versions": []any{"ollama -v"}, "code_ref": "cat ~/app/VERSION"}}}
+	if !strings.Contains(cmd(ad, "health"), ":9000/health") || !strings.Contains(cmd(ad, "pkgs"), "postgresql-16") ||
+		!strings.Contains(cmd(ad, "pkgs"), "ollama -v") || cmd(ad, "code_ref") != "cat ~/app/VERSION" {
+		t.Fatal(Commands(ad))
 	}
 }
