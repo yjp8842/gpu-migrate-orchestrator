@@ -267,3 +267,18 @@ func TestLoadDotEnv(t *testing.T) {
 		t.Fatal("잘못된 줄을 넘겼다")
 	}
 }
+
+// WidgetRAG Shell 패키지는 실행 파일 층 · 기준선 · 골든이 다 있어야 한다 — 하나라도 아니면 package 단계가 경고한다.
+func TestWidgetragShellPackageExpect(t *testing.T) {
+	ad, err := LoadAdapter("widgetrag-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"APP_STATUS": "included", "BASELINE_STATUS": "ok", "GOLDEN_STATUS": "ok"}
+	got := ad.PackageExpect()
+	for k, v := range want {
+		if got[k] != v {
+			t.Fatalf("package_expect %s = %q, want %q (전체 %v)", k, got[k], v, got)
+		}
+	}
+}

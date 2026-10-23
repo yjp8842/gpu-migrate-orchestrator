@@ -21,7 +21,7 @@ logs:
   exit: "~/tc-run.exit"          # 진입 한 줄의 종료 코드 (재부팅 전 구간)
 proc_pattern: "scripts/local/bootstrap.sh"   # 기동 중인 진입 한 줄을 찾는 pgrep -f 패턴 (이미 돌면 다시 띄우지 않는다)
 package_marker: MANIFEST.txt     # package.sh backup 이 마지막에 쓰는 파일 — 있으면 재개 때 backup 을 건너뛴다
-package_expect: { APP_STATUS: included }   # 실행 파일 층이 패키지에 있어야 한다 (다르면 경고)
+package_expect: { APP_STATUS: included, BASELINE_STATUS: ok, GOLDEN_STATUS: ok }   # 실행 파일 층 · 소스 기준선 · 골든 응답이 패키지에 있어야 한다 (다르면 경고)
 resume_unit: widgetrag-bootstrap-resume
 # 판정 단계가 타겟에서 받아 run 폴더 verify/target/ 에 두는 것 — 판정과 무관하게 받는다 (테스트 이력)
 diagnostics:
