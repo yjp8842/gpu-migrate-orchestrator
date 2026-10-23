@@ -7,6 +7,7 @@ package stages
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -139,39 +140,8 @@ func runProvision(ctx *Context) (M, error) {
 		if err != nil {
 			return nil, err
 		}
-		seed := ctx.State.KeyS("beetle_name_seed")
-		if ctx.State.HasKey("beetle_migrate_started") {
-			// 앞선 생성 요청의 응답을 못 받고 멈췄다 — run 마다 고유한 nameSeed 로 Beetle 이 만든 인프라를 찾아 이어 간다
-			found, err := findSeeded(b, ns, seed)
-			if err != nil {
-				return nil, err
-			}
-			if found == "" {
-				return nil, Errf("Beetle 생성을 시작했지만 nameSeed %s 로 만든 인프라가 없습니다 — Beetle UI 에서 ID 를 찾아 state.json 의 keys.target_infra_id 에 적고 다시 돌리세요", seed)
-			}
-			id = found
-			ctx.State.SetKey("target_infra_id", id)
-			ctx.Log.Warn(stProvision, "앞선 Beetle 생성 요청이 만든 인프라 %s 를 찾아 이어 갑니다", id)
-		} else {
-			if seed == "" {
-				seed = NameSeed(name, ctx.State.Data.RunID)
-				ctx.State.SetKey("beetle_name_seed", seed) // 부작용 전에 기록
-			}
-			ctx.State.SetKey("beetle_migrate_started", true)
-			// ★ useExisting=false — 기본값 true 는 같은 이름의 vNet · SSH 키 · 보안 그룹을 재사용해, 다른 run(사례)의
-			//   자원을 끌어다 쓰고 정리 때 함께 지울 수 있다. nameSeed 도 run 마다 달라 이름이 겹치지 않는다.
-			ctx.Log.Info(stProvision, "Beetle 생성 요청: nameSeed %s · useExisting=false (동기, 수 분)", seed)
-			data, err := b.MigrateInfra(ns, req, seed, false, 30*time.Minute)
-			if err != nil {
-				return nil, err
-			}
-			id = jsonx.Str(jsonx.Or(data["id"], data["name"]))
-			if id == "" {
-				raw, _ := jsonx.Marshal(data, false)
-				return nil, Errf("Beetle 생성 응답에 인프라 ID 가 없습니다: %s", headStr(string(raw), 300))
-			}
-			ctx.State.SetKey("target_infra_id", id)
-			ctx.Log.Info(stProvision, "Beetle 가 만든 인프라: %s (%s)", id, jsonx.S(data, "status"))
+		if id, err = beetleCreate(ctx, b, tb, ns, name, req); err != nil {
+			return nil, err
 		}
 	}
 
@@ -217,6 +187,154 @@ func runProvision(ctx *Context) (M, error) {
 		return nil, err
 	}
 	return M{"infra": id, "ip": node["publicIP"]}, nil
+}
+
+// zoneCapacity 는 「그 존에 자원이 없다」는 생성 실패다 — 다른 존에서는 될 수 있다.
+// (GCP ZONE_RESOURCE_POOL_EXHAUSTED · "does not have enough resources", AWS InsufficientInstanceCapacity ·
+// 그 존에서 안 되는 사양, Tumblebug 실패 분류 ZoneCapacity)
+var zoneCapacity = regexp.MustCompile(`(?i)does not have enough resources|ZONE_RESOURCE_POOL_EXHAUSTED|InsufficientInstanceCapacity|ZoneCapacity|is not supported in your requested Availability Zone|not available in the requested availability zone`)
+
+// IsZoneCapacity 는 생성 오류가 존 자원 부족인지다.
+func IsZoneCapacity(err error) bool { return err != nil && zoneCapacity.MatchString(err.Error()) }
+
+// zoneOrder 는 Beetle 생성을 시도할 존 순서다 — 사례 target.zone(있으면) → 연결의 기본 존 → 그 리전의 나머지 존.
+// 존 목록을 못 받으면 사례 존(없으면 기본 존 하나 — "")만 시도한다.
+func zoneOrder(ctx *Context, tb Tumblebug, req M) []string {
+	first := jsonx.S(ctx.Case.Target(), "zone")
+	conn := ""
+	if ngs := jsonx.ListM(jsonx.Get(req, "targetInfra", "nodeGroups")); len(ngs) > 0 {
+		conn = jsonx.S(ngs[0], "connectionName")
+	}
+	assigned, zones, err := "", []string(nil), error(nil)
+	if conn != "" {
+		assigned, zones, err = tb.ConnZones(conn)
+	}
+	if err != nil || len(zones) == 0 {
+		ctx.Log.Warn(stProvision, "연결 %s 의 존 목록을 받지 못해 존 넘김 없이 한 번만 시도합니다: %v", conn, errOr(err, "존 목록 없음"))
+		return []string{first}
+	}
+	out, seen := []string{}, map[string]bool{}
+	for _, z := range append([]string{first, assigned}, zones...) {
+		if z != "" && !seen[z] {
+			seen[z] = true
+			out = append(out, z)
+		}
+	}
+	return out
+}
+
+// withZone 은 생성 요청의 서브넷 존을 z 로 바꾼 사본이다 (Beetle 생성은 서브넷 존에 VM 을 만든다). z 가 비면 그대로.
+func withZone(req M, z string) M {
+	body := jsonx.Clone(req).(M)
+	if z == "" {
+		return body
+	}
+	for _, sn := range jsonx.ListM(jsonx.Get(body, "targetVNet", "subnetInfoList")) {
+		sn["zone"] = z
+	}
+	return body
+}
+
+// beetleCreate 는 Beetle 로 타겟을 만들고 인프라 ID 를 돌려준다. 존 자원 부족으로 실패하면 그 시도가 남긴 인프라를
+// Beetle 삭제 API 로 지우고(vNet · 보안 그룹 · SSH 키 포함) 다음 존으로 다시 보낸다 — 시도는 state 의 provision_zone_tries.
+// 재개 때 앞선 시도의 인프라가 Failed 로 남아 있으면 같은 방식으로 지우고 다음 존부터 이어 간다.
+func beetleCreate(ctx *Context, b Beetle, tb Tumblebug, ns, name string, req M) (string, error) {
+	seed := ctx.State.KeyS("beetle_name_seed")
+	if seed == "" {
+		seed = NameSeed(name, ctx.State.Data.RunID)
+		ctx.State.SetKey("beetle_name_seed", seed) // 부작용 전에 기록
+	}
+	zones := jsonx.Strings(ctx.State.Key("provision_zones"))
+	if len(zones) == 0 {
+		zones = zoneOrder(ctx, tb, req)
+		ctx.State.SetKey("provision_zones", zones)
+	}
+	tries := jsonx.ListM(ctx.State.Key("provision_zone_tries"))
+	retire := func(zone, why string) error {
+		found, err := findSeeded(b, ns, seed)
+		if err != nil {
+			return err
+		}
+		if found != "" {
+			if _, err := b.DeleteInfra(ns, found); err != nil {
+				return Errf("존 %s 시도가 남긴 인프라 %s 를 지우지 못했습니다 — Beetle UI · MapUI 에서 지운 뒤 다시 돌리세요: %v", zone, found, err)
+			}
+			ctx.Log.Info(stProvision, "존 %s 시도가 남긴 인프라 %s 를 지움 (Beetle — vNet · 보안 그룹 · SSH 키 포함)", zone, found)
+		}
+		tries = append(tries, M{"zone": zone, "error": headStr(why, 300), "deleted": found})
+		ctx.State.SetKey("provision_zone_tries", tries)
+		ctx.State.DelKey("beetle_migrate_started")
+		return nil
+	}
+	if ctx.State.HasKey("beetle_migrate_started") {
+		// 앞선 생성 요청의 응답을 못 받고 멈췄다 — run 마다 고유한 nameSeed 로 Beetle 이 만든 인프라를 찾아 이어 간다
+		found, err := findSeeded(b, ns, seed)
+		if err != nil {
+			return "", err
+		}
+		if found == "" {
+			return "", Errf("Beetle 생성을 시작했지만 nameSeed %s 로 만든 인프라가 없습니다 — Beetle UI 에서 ID 를 찾아 state.json 의 keys.target_infra_id 에 적고 다시 돌리세요", seed)
+		}
+		inf, err := tb.GetInfra(ns, found)
+		if err != nil {
+			return "", err
+		}
+		if tumblebug.InfraState(inf) != "Failed" {
+			ctx.State.SetKey("target_infra_id", found)
+			ctx.Log.Warn(stProvision, "앞선 Beetle 생성 요청이 만든 인프라 %s 를 찾아 이어 갑니다", found)
+			return found, nil
+		}
+		zone := ctx.State.KeyS("provision_zone")
+		ctx.Log.Warn(stProvision, "앞선 시도(존 %s)의 인프라 %s 가 %s 로 남아 있습니다 — 지우고 다음 존으로", zone, found, jsonx.S(inf, "status"))
+		if err := retire(zone, "앞선 시도가 "+jsonx.S(inf, "status")+" 로 남음"); err != nil {
+			return "", err
+		}
+	}
+	for len(tries) < len(zones) {
+		zone := zones[len(tries)]
+		body := withZone(req, zone)
+		ctx.State.SetKey("provision_zone", zone)
+		ctx.State.SetKey("beetle_migrate_started", true) // 부작용 전에 기록
+		if _, err := ctx.WriteJSON(stProvision, "migrate-request.sent.json", body); err != nil {
+			return "", err
+		}
+		// ★ useExisting=false — 기본값 true 는 같은 이름의 vNet · SSH 키 · 보안 그룹을 재사용해, 다른 run(사례)의
+		//   자원을 끌어다 쓰고 정리 때 함께 지울 수 있다. nameSeed 도 run 마다 달라 이름이 겹치지 않는다.
+		ctx.Log.Info(stProvision, "Beetle 생성 요청: nameSeed %s · 존 %s (%d/%d) · useExisting=false (동기, 수 분)", seed, zoneLabel(zone), len(tries)+1, len(zones))
+		data, err := b.MigrateInfra(ns, body, seed, false, 30*time.Minute)
+		if err != nil {
+			if !IsZoneCapacity(err) || len(tries)+1 >= len(zones) {
+				if IsZoneCapacity(err) {
+					if rerr := retire(zone, err.Error()); rerr != nil {
+						return "", rerr
+					}
+					return "", Errf("모든 존(%s)에서 자원이 없어 만들지 못했습니다 — 쿼터 · 다른 사양 · 리전을 보세요. 마지막 오류: %s", strings.Join(zones, " · "), headStr(err.Error(), 300))
+				}
+				return "", err
+			}
+			ctx.Log.Warn(stProvision, "존 %s 에 자원이 없습니다 — 남은 자원을 지우고 다음 존으로: %s", zoneLabel(zone), headStr(err.Error(), 200))
+			if rerr := retire(zone, err.Error()); rerr != nil {
+				return "", rerr
+			}
+			continue
+		}
+		id := jsonx.Str(jsonx.Or(data["id"], data["name"]))
+		if id == "" {
+			raw, _ := jsonx.Marshal(data, false)
+			return "", Errf("Beetle 생성 응답에 인프라 ID 가 없습니다: %s", headStr(string(raw), 300))
+		}
+		ctx.State.SetKey("target_infra_id", id)
+		ctx.Log.Info(stProvision, "Beetle 가 만든 인프라: %s (%s) · 존 %s", id, jsonx.S(data, "status"), zoneLabel(zone))
+		return id, nil
+	}
+	return "", Errf("시도할 존이 남지 않았습니다 (%s) — state.json 의 provision_zone_tries 를 보세요", strings.Join(zones, " · "))
+}
+
+func zoneLabel(z string) string {
+	if z == "" {
+		return "기본"
+	}
+	return z
 }
 
 // NameSeed 는 Beetle nameSeed 를 run 마다 고유하게 만든다 — 사례의 target.name 뒤에 run 시각(월일시분)을 붙인다.

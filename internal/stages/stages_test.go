@@ -50,7 +50,12 @@ type fakeTB struct {
 	async       []string
 	asyncStatus string
 	cmdStatus   map[string][]M
+	// 연결의 기본 존 · 존 목록 (ConnZones)
+	assigned string
+	zones    []string
 }
+
+func (f *fakeTB) ConnZones(conn string) (string, []string, error) { return f.assigned, f.zones, nil }
 
 func (f *fakeTB) GetInfra(ns, id string) (M, error) {
 	f.calls = append(f.calls, "infra")
@@ -128,16 +133,30 @@ type fakeBeetle struct {
 	use     *bool
 	ids     []string
 	deleted []string
+	// 생성 시도별 오류 (차례로 쓰고, 다 쓰면 b.migrate 를 돌려준다) · 보낸 본문
+	migrateErrs []error
+	migrateSent []M
 }
 
 func (b *fakeBeetle) RecommendInfra(req M, limit int) ([]any, error) { b.called++; return b.cands, nil }
 func (b *fakeBeetle) MigrateInfra(ns string, body M, seed string, use bool, to time.Duration) (M, error) {
 	b.seed, b.use = seed, &use
+	b.migrateSent = append(b.migrateSent, body)
+	if n := len(b.migrateSent); n <= len(b.migrateErrs) && b.migrateErrs[n-1] != nil {
+		b.ids = append(b.ids, seed+"-gpu-infra-01") // 실패한 시도도 Failed 인프라를 남긴다 (10/23 GCP)
+		return nil, b.migrateErrs[n-1]
+	}
 	return b.migrate, nil
 }
 func (b *fakeBeetle) ListInfraIDs(ns string) ([]string, error) { return b.ids, nil }
 func (b *fakeBeetle) DeleteInfra(ns, id string) (any, error) {
 	b.deleted = append(b.deleted, id)
+	for i, x := range b.ids {
+		if x == id {
+			b.ids = append(b.ids[:i], b.ids[i+1:]...)
+			break
+		}
+	}
 	return M{}, nil
 }
 func (b *fakeBeetle) EncryptionKey() (M, error) { return M{"keyId": "k1", "publicKey": b.pub}, nil }
@@ -282,6 +301,30 @@ func TestRecommendDryRunCallsBeetle(t *testing.T) {
 	}
 }
 
+// 사례 target.zone 은 Beetle 생성 요청의 서브넷 zone 으로 들어간다 (Beetle 은 서브넷 존에 VM 을 만든다).
+func TestRecommendZonePinsSubnet(t *testing.T) {
+	ctx := newCtx(t, &fakeTB{}, &fakeBeetle{cands: liveCands(t)}, true)
+	writeModel(t, ctx)
+	ctx.Case.Target()["zone"] = "asia-northeast3-b"
+	if _, err := runRecommend(ctx); err != nil {
+		t.Fatal(err)
+	}
+	req := readJSON(t, ctx, "recommend", "migrate-request.json")
+	subnets := jsonx.ListM(jsonx.Get(req, "targetVNet", "subnetInfoList"))
+	if len(subnets) == 0 {
+		t.Fatal("서브넷 없음", req)
+	}
+	for _, sn := range subnets {
+		if jsonx.S(sn, "zone") != "asia-northeast3-b" {
+			t.Fatal(sn)
+		}
+	}
+	b, _ := os.ReadFile(filepath.Join(ctx.RunDir, "recommend", "rationale.md"))
+	if !strings.Contains(string(b), "asia-northeast3-b (사례 target.zone)") {
+		t.Fatal(string(b))
+	}
+}
+
 func TestRecommendPlaceholderFlagged(t *testing.T) {
 	ctx := newCtx(t, &fakeTB{}, &fakeBeetle{cands: liveCands(t)}, true)
 	writeModel(t, ctx)
@@ -348,6 +391,100 @@ func TestProvisionBeetleMissingInfraID(t *testing.T) {
 	}
 	if fb.use == nil || *fb.use || fb.seed != ctx.State.KeyS("beetle_name_seed") || !strings.HasPrefix(fb.seed, "wr-gcp-") {
 		t.Fatalf("useExisting=false · run 별 nameSeed 로 보내지 않았다: %v %q", fb.use, fb.seed)
+	}
+}
+
+func zoneReq() M {
+	return M{"targetInfra": M{"nodeGroups": []any{M{"connectionName": "gcp-asia-northeast3"}}},
+		"targetVNet": M{"cidrBlock": "10.0.0.0/13", "subnetInfoList": []any{M{"name": "subnet-01", "ipv4_CIDR": "10.2.0.0/16"}}}}
+}
+
+var errNoCapacity = errors.New(`HTTP 500 — VM wr-gcp-1-vm-1: Operation errors: The zone 'projects/p/zones/asia-northeast3-a' does not have enough resources available to fulfill the request.`)
+
+// 존 자원 부족이면 남은 인프라를 Beetle 로 지우고 다음 존으로 다시 보낸다 — 기본 존(a) → b.
+func TestProvisionBeetleZoneFallback(t *testing.T) {
+	fb := &fakeBeetle{migrate: M{"id": "x"}, migrateErrs: []error{errNoCapacity}}
+	tb := &fakeTB{assigned: "asia-northeast3-a", zones: []string{"asia-northeast3-a", "asia-northeast3-b", "asia-northeast3-c"}}
+	ctx := newCtx(t, tb, fb, false)
+	id, err := beetleCreate(ctx, fb, tb, "default", "wr-gcp", zoneReq())
+	if err != nil || id != "x" {
+		t.Fatal(id, err)
+	}
+	zoneOf := func(body M) string {
+		return jsonx.S(jsonx.ListM(jsonx.Get(body, "targetVNet", "subnetInfoList"))[0], "zone")
+	}
+	if len(fb.migrateSent) != 2 || zoneOf(fb.migrateSent[0]) != "asia-northeast3-a" || zoneOf(fb.migrateSent[1]) != "asia-northeast3-b" {
+		t.Fatal(len(fb.migrateSent), fb.migrateSent)
+	}
+	if len(fb.deleted) != 1 || !strings.HasSuffix(fb.deleted[0], "-gpu-infra-01") {
+		t.Fatal("남은 인프라를 지우지 않았다", fb.deleted)
+	}
+	tries := jsonx.ListM(ctx.State.Key("provision_zone_tries"))
+	if len(tries) != 1 || jsonx.S(tries[0], "zone") != "asia-northeast3-a" || ctx.State.KeyS("provision_zone") != "asia-northeast3-b" {
+		t.Fatal(tries, ctx.State.KeyS("provision_zone"))
+	}
+}
+
+// 사례 target.zone 이 있으면 그 존부터, 존 자원 부족이 아닌 오류는 넘기지 않고 멈춘다.
+func TestProvisionBeetleZoneOrderAndOtherError(t *testing.T) {
+	fb := &fakeBeetle{migrateErrs: []error{errors.New("HTTP 500 — quota exceeded for GPUS_ALL_REGIONS")}}
+	tb := &fakeTB{assigned: "asia-northeast3-a", zones: []string{"asia-northeast3-a", "asia-northeast3-b", "asia-northeast3-c"}}
+	ctx := newCtx(t, tb, fb, false)
+	ctx.Case.Target()["zone"] = "asia-northeast3-c"
+	if _, err := beetleCreate(ctx, fb, tb, "default", "wr-gcp", zoneReq()); err == nil || !strings.Contains(err.Error(), "quota") {
+		t.Fatal(err)
+	}
+	if got := jsonx.Strings(ctx.State.Key("provision_zones")); strings.Join(got, ",") != "asia-northeast3-c,asia-northeast3-a,asia-northeast3-b" {
+		t.Fatal(got)
+	}
+	if len(fb.migrateSent) != 1 || len(fb.deleted) != 0 || !ctx.State.HasKey("beetle_migrate_started") {
+		t.Fatal(len(fb.migrateSent), fb.deleted)
+	}
+}
+
+// 모든 존에서 자원이 없으면 마지막 시도도 지우고, 시도한 존을 대며 멈춘다.
+func TestProvisionBeetleAllZonesFull(t *testing.T) {
+	fb := &fakeBeetle{migrateErrs: []error{errNoCapacity, errNoCapacity}}
+	tb := &fakeTB{assigned: "z-a", zones: []string{"z-a", "z-b"}}
+	ctx := newCtx(t, tb, fb, false)
+	if _, err := beetleCreate(ctx, fb, tb, "default", "wr-gcp", zoneReq()); err == nil || !strings.Contains(err.Error(), "z-a · z-b") {
+		t.Fatal(err)
+	}
+	if len(fb.deleted) != 2 || len(fb.ids) != 0 || ctx.State.HasKey("beetle_migrate_started") {
+		t.Fatal(fb.deleted, fb.ids)
+	}
+}
+
+// 재개 때 앞선 시도의 인프라가 Failed 로 남아 있으면 지우고 다음 존부터 이어 간다.
+func TestProvisionBeetleResumeFailedInfra(t *testing.T) {
+	fb := &fakeBeetle{migrate: M{"id": "y"}}
+	tb := &fakeTB{assigned: "z-a", zones: []string{"z-a", "z-b"}, infra: M{"status": "Failed:1 (R:0/1)"}}
+	ctx := newCtx(t, tb, fb, false)
+	ctx.State.SetKey("beetle_name_seed", "wr-gcp-1")
+	ctx.State.SetKey("provision_zones", []any{"z-a", "z-b"})
+	ctx.State.SetKey("provision_zone", "z-a")
+	ctx.State.SetKey("beetle_migrate_started", true)
+	fb.ids = []string{"wr-gcp-1-gpu-infra-01"}
+	id, err := beetleCreate(ctx, fb, tb, "default", "wr-gcp", zoneReq())
+	if err != nil || id != "y" || len(fb.deleted) != 1 || len(fb.migrateSent) != 1 {
+		t.Fatal(id, err, fb.deleted, len(fb.migrateSent))
+	}
+	if z := jsonx.S(jsonx.ListM(jsonx.Get(fb.migrateSent[0], "targetVNet", "subnetInfoList"))[0], "zone"); z != "z-b" {
+		t.Fatal(z)
+	}
+}
+
+func TestIsZoneCapacity(t *testing.T) {
+	for msg, want := range map[string]bool{
+		"The zone 'x' does not have enough resources available":                                  true,
+		"ZONE_RESOURCE_POOL_EXHAUSTED":                                                           true,
+		"InsufficientInstanceCapacity: We currently do not have sufficient g4dn.xlarge capacity": true,
+		"VcpuLimitExceeded": false,
+		"quota exceeded":    false,
+	} {
+		if IsZoneCapacity(errors.New(msg)) != want {
+			t.Fatal(msg)
+		}
 	}
 }
 

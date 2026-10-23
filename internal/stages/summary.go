@@ -60,7 +60,7 @@ func Summarize(c *config.Case, rs *state.RunState) error {
 		lines = append(lines, "- (없음)")
 	}
 	lines = append(lines, "", "## 자원 · 키", "")
-	for _, k := range []string{"target_infra_id", "backup_out", "sg_rules_added", "xreq_backup", "xreq_rebuild", "start_outcome", "beetle_name_seed", "beetle_data_req", "beetle_data_req_2", "beetle_data_req_3", "beetle_hooks", "source_restored", "staging_left", "status_only"} {
+	for _, k := range []string{"target_infra_id", "backup_out", "sg_rules_added", "xreq_backup", "xreq_rebuild", "start_outcome", "beetle_name_seed", "provision_zone", "provision_zone_tries", "beetle_data_req", "beetle_data_req_2", "beetle_data_req_3", "beetle_hooks", "source_restored", "staging_left", "status_only"} {
 		if val, ok := st.Keys[k]; ok {
 			b, _ := jsonx.Marshal(val, false)
 			lines = append(lines, fmt.Sprintf("- %s: %s", k, string(b)))

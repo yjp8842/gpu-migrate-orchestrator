@@ -10,7 +10,7 @@ target:
   tumblebug: default                  # Beetle 이 만든 인프라가 사는 Tumblebug (settings 이름) — 기동 · 키 조회에 쓴다
   csp: gcp
   region: asia-northeast3
-  zone: null
+  zone: null                          # 연결의 기본 존(a)부터 — 자원이 없으면 도구가 b · c 로 넘어간다 (10/23 a 존 L4 부족). 특정 존부터 하려면 asia-northeast3-b 처럼 적는다
   ns: default
   name: wr-gcp                        # Beetle nameSeed 앞부분 (run 마다 뒤에 시각이 붙는다)
   spec: null

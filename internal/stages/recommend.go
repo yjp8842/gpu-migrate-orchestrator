@@ -270,6 +270,16 @@ func runRecommend(ctx *Context) (M, error) {
 		info = jsonx.AsM(ctx.State.Key("target_image_info"))
 	}
 	adjusted, changes := policy.AdjustCandidate(cand, pol, imageID, ctx.Case.OpenPorts(), info)
+	// 사례 target.zone — Beetle 생성은 노드 그룹이 아니라 서브넷의 zone 으로 VM 존을 정한다 (비우면 연결의 기본 존).
+	// GPU 는 존마다 자원이 달라 기본 존에서 「does not have enough resources」가 나면 다른 존을 적는다 (10/23 GCP L4).
+	if z := jsonx.S(tgt, "zone"); z != "" {
+		for _, sn := range jsonx.ListM(jsonx.Get(adjusted, "targetVNet", "subnetInfoList")) {
+			if jsonx.S(sn, "zone") != z {
+				changes = append(changes, fmt.Sprintf("서브넷 %s 존 %s → %s (사례 target.zone)", jsonx.S(sn, "name"), jsonx.SOr(sn, "zone", "기본"), z))
+				sn["zone"] = z
+			}
+		}
+	}
 	if _, err := ctx.WriteJSON(stRecommend, "migrate-request.json", adjusted); err != nil {
 		return nil, err
 	}

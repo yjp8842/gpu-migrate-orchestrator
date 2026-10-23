@@ -115,6 +115,7 @@ cp .env.example .env
 
 - **재실행 안정성.** 인프라 이름 · Beetle nameSeed · 원격 명령 X-Request-Id · 패키지 경로를 부작용 전에 state 에 적고, 재개 때 조회로 이어 간다. 생성 · 원격 명령 POST 는 자동 재시도하지 않고, 서버가 받지 않은 요청(429, Beetle 비동기 시작의 503)만 Retry-After 만큼 쉬고 다시 보낸다. Beetle 은 같은 X-Request-Id 를 409 로 거절하는데, 이미 받은 요청이라 상태를 이어서 본다.
 - **Beetle 생성.** nameSeed 는 `target.name` + run 시각(월일시분, 20자 이하)으로 run 마다 다르고 `useExisting=false` 로 보낸다 — 기본값 true 는 같은 이름의 vNet · SSH 키 · 보안 그룹을 재사용한다. 생성 응답을 못 받고 멈췄으면 재개 때 nameSeed 로 Beetle 인프라 목록에서 찾아 이어 간다.
+- **존 자동 넘김 (Beetle 생성).** Beetle 은 VM 을 서브넷 존에 만들고, 추천은 존별 자원을 보지 않는다. 시도 순서는 사례 `target.zone`(있으면) → 연결의 기본 존(`/connConfig` 의 `assignedZone`) → 그 리전의 나머지 존. 생성이 존 자원 부족(GCP `does not have enough resources` · `ZONE_RESOURCE_POOL_EXHAUSTED`, AWS `InsufficientInstanceCapacity` 등)으로 실패하면 그 시도가 남긴 인프라를 Beetle 삭제 API 로 지우고(vNet · 보안 그룹 · SSH 키 포함) 다음 존으로 다시 보낸다. 쿼터 초과 같은 다른 오류는 넘기지 않고 멈춘다. 시도는 `state.json` 의 `provision_zone_tries`, 마지막에 보낸 본문은 `provision/migrate-request.sent.json`. 재개 때 앞선 시도의 인프라가 Failed 로 남아 있으면 같은 방식으로 지우고 다음 존부터 이어 간다.
 - **재개 때 앞선 요청 다루기.** 재기동 · backup 원격 명령과 Beetle 이관은 적어 둔 요청의 상태부터 본다. 도는 중이거나 성공이면 그 요청을 이어서 보고, 실패로 끝났거나 기록이 없으면(보내기 전에 멈춤) 새 ID 로 다시 보낸다. Beetle 이관은 성공했지만 타겟 대조에서 떨어진 경우도 다시 보낸다. 앞선 시도는 `state.json` 의 `<키>_tries` 에 남고, 그 시도의 산출물은 `backup.try1.stdout.txt` 처럼 이름을 바꿔 둔다. 앞선 시도가 남긴 원격 폴더(소스의 backup 출력 폴더, 타겟의 패키지 폴더)는 지우지 않고 `<폴더>.failed-<N>` 으로 옮긴다. 같은 실행 안에서는 다시 보내지 않는다 — 실패하면 멈추고, 원인을 본 뒤 `--resume` 으로 다시 보낸다. 기동 단계는 여기에 들지 않는다(재개하면 확인만 다시 한다).
 - **dry-run 은 조회를 실제로 한다.** 쓰기 여부는 메서드가 아니라 호출별로 정한다 (제어는 GET 이지만 쓰기, searchImage · recommendSpec · Beetle 추천은 POST 지만 조회, Beetle 암호화 키 발급은 GET 이지만 쓰기). 소스가 아직 없으면 자리표시자 모델(AWS g4dn.xlarge · T4 · Ubuntu 24.04)로 추천받고 `rationale.md` 에 적는다.
 - **분리 실행.** 단일 명령은 드라이버 설치 뒤 재부팅하고, Tumblebug 는 끊긴 원격 명령을 한 번 더 실행한다. 그래서 즉시 반환하는 launcher 만 보내고, 이미 돌고 있으면 띄우지 않는다. 완료는 어댑터 `done` 으로 본다(기본 `results.csv` 행 수 증가).
@@ -125,7 +126,7 @@ cp .env.example .env
 
 ## 검증 상태 (2026-10-22)
 
-- `go test ./...` — 100개 통과 (설정 · 상태 · 클라이언트 재시도와 dry-run 차단 · 정책 · 판정 · 소스 모델 · 상태 확인 · 원격 명령 표식 · 홈 경로 · 폴더 받기 · Beetle 이관 본문의 키 암호화 · 단계 · 10/23 범용 어댑터: 전송 목록 · 완료 판정 · 상태 파일 판정 · 기존 설치 · 재기동 중복 방지 · Beetle nameSeed · 503/409 · Beetle 삭제 · 소스 되돌리기 · 결과표 없는 워크로드 · 결과표 열 이름 · 상태 확인 명령 · Beetle 경로의 홈 절대경로화 · 소스 OS 그대로).
+- `go test ./...` — 119개 통과 (설정 · 상태 · 클라이언트 재시도와 dry-run 차단 · 정책 · 판정 · 소스 모델 · 상태 확인 · 원격 명령 표식 · 홈 경로 · 폴더 받기 · Beetle 이관 본문의 키 암호화 · 단계 · 10/23 범용 어댑터: 전송 목록 · 완료 판정 · 상태 파일 판정 · 기존 설치 · 재기동 중복 방지 · Beetle nameSeed · 503/409 · Beetle 삭제 · 소스 되돌리기 · 결과표 없는 워크로드 · 결과표 열 이름 · 상태 확인 명령 · Beetle 경로의 홈 절대경로화 · 소스 OS 그대로).
 - 이전 파이썬 판(저장소에는 두지 않는다)과 같은 사례로 비교: 두 사례 dry-run 과 종료된 소스 기록의 실제 수집 → 추천에서 Tumblebug · Beetle 요청 순서와 소스 모델 · 추천 후보 · 생성 요청이 같았다.
 - **생성부터 정리까지는 아직 돌리지 않았다.** 테스트 4(AWS→AWS)가 첫 실 운행이다. Beetle 생성 · 데이터 이관도 아직 호출하지 않았다.
 

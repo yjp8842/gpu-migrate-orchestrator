@@ -18,7 +18,7 @@ target:
   tumblebug: default                  # 타겟 인프라가 사는 Tumblebug (settings.yaml 의 tumblebugs 이름)
   csp:                                # 채움 — 예) aws | gcp | azure
   region:                             # 채움 — CSP 리전 이름. 예) ap-northeast-2 (AWS 서울) | asia-northeast3 (GCP 서울)
-  zone: null                          # null 이면 Auto (고정하면 VPC 한도에 걸릴 수 있다)
+  zone: null                          # null 이면 연결의 기본 존부터. 적으면 그 존부터 — 어느 쪽이든 Beetle 생성이 「존 자원 부족」이면 같은 리전의 다음 존으로 넘어간다
   ns: default                         # 비우면 source.ns
   name:                               # 채움 — beetle: nameSeed 앞부분, run 마다 뒤에 시각이 붙는다 (예: wr-gcp → wr-gcp-10231418) | tumblebug: 인프라 이름 (예: wr-aws-tgt-01)
   spec: null                          # provider=tumblebug 일 때만 채움 — Tumblebug specId. 예) aws+ap-northeast-2+g4dn.xlarge

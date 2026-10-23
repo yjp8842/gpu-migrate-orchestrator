@@ -381,6 +381,16 @@ func (c *Client) GetVNet(ns, id string) (M, error) {
 	return c.reqM("GET", "/ns/"+ns+"/resources/vNet/"+id, Opts{Allow404: true})
 }
 
+// ConnZones 는 연결(connConfig)의 기본 존과 그 리전의 존 목록이다 — GET /connConfig/{name} 의
+// regionZoneInfo.assignedZone · regionDetail.zones. 존을 정하지 않은 생성은 기본 존으로 간다.
+func (c *Client) ConnZones(conn string) (string, []string, error) {
+	d, err := c.reqM("GET", "/connConfig/"+conn, Opts{})
+	if err != nil {
+		return "", nil, err
+	}
+	return jsonx.S(jsonx.AsM(d["regionZoneInfo"]), "assignedZone"), jsonx.Strings(jsonx.AsM(d["regionDetail"])["zones"]), nil
+}
+
 // GetSecurityGroup 은 firewallRules: [{Port, Protocol, Direction, CIDR}].
 func (c *Client) GetSecurityGroup(ns, id string) (M, error) {
 	return c.reqM("GET", "/ns/"+ns+"/resources/securityGroup/"+id, Opts{Allow404: true})

@@ -41,6 +41,7 @@ type Tumblebug interface {
 	AddSGRules(ns, sg string, rules []M) (any, error)
 	GetVNet(ns, id string) (M, error)
 	GetSecurityGroup(ns, id string) (M, error)
+	ConnZones(conn string) (string, []string, error)
 	ResolveSpec(ns, id string) (M, error)
 	ResolveImage(ns, id string) (M, error)
 	FindImage(provider, region, osType string) (M, error)
