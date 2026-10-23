@@ -1,6 +1,0 @@
-{"resourceType": "infra", "id": "widgetrag-shell-aws", "name": "widgetrag-shell-aws", "status": "Running:1 (R:1/1)",
- "label": {"gmp.case": "aws-to-aws-widgetrag-a", "gmp.run": "20261022-100000"},
- "node": [{"id": "g1-1", "name": "g1-1", "nodeGroupId": "g1", "status": "Running", "publicIP": "198.51.100.67", "privateIP": "10.2.80.73",
-           "sshPort": 22, "cspResourceId": "i-0123456789abcdef0", "specId": "aws+ap-northeast-2+g4dn.xlarge",
-           "imageId": "aws+ap-northeast-2+ubuntu24.04", "securityGroupIds": ["widgetrag-shell-aws-g1"], "sshKeyId": "widgetrag-shell-aws-aws-ap-northeast-2",
-           "createdTime": "2026-10-19 07:43:07"}]}

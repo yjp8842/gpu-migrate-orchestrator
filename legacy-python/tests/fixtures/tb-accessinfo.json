@@ -1,5 +1,0 @@
-{"InfraId": "widgetrag-shell-aws",
- "InfraNodeGroupAccessInfo": [{"NodeGroupId": "g1", "BastionNodeId": "",
-   "NodeAccessInfo": [{"nodeId": "g1-1", "publicIP": "198.51.100.67", "privateIP": "10.2.80.73", "sshPort": 22,
-                       "privateKey": "-----BEGIN RSA PRIVATE KEY-----\nREDACTED\n-----END RSA PRIVATE KEY-----\n",
-                       "nodeUserName": "cb-user", "connectionConfig": {"configName": "aws-ap-northeast-2"}}]}]}

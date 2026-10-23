@@ -87,9 +87,8 @@ cp .env.example .env
 ## 검증 상태 (2026-10-22)
 
 - `go test ./...` — 60개 통과 (설정 · 상태 · 클라이언트 재시도와 dry-run 차단 · 정책 · 판정 · 소스 모델 · 상태 확인 · 원격 명령 표식 · 홈 경로 · 폴더 받기 · Beetle 이관 본문의 키 암호화 · 단계).
-- 파이썬 판과 같은 사례로 비교: 두 사례 dry-run 과 종료된 소스 기록의 실제 수집 → 추천에서 Tumblebug · Beetle 요청 순서와 소스 모델 · 추천 후보 · 생성 요청이 같았다.
+- 이전 파이썬 판(저장소에는 두지 않는다)과 같은 사례로 비교: 두 사례 dry-run 과 종료된 소스 기록의 실제 수집 → 추천에서 Tumblebug · Beetle 요청 순서와 소스 모델 · 추천 후보 · 생성 요청이 같았다.
 - **생성부터 정리까지는 아직 돌리지 않았다.** 테스트 4(AWS→AWS)가 첫 실 운행이다. Beetle 생성 · 데이터 이관도 아직 호출하지 않았다.
-- 파이썬 1차 구현은 `legacy-python/` 에 보관했다 (그 판의 결함과 차이는 그 폴더 README).
 
 ## 결정 필요
 
@@ -111,5 +110,5 @@ internal/inspect        소스 VM 상태 확인 명령과 해석
 internal/policy         후보 선택 · 보정
 internal/judge          결과표 · 비교표 → 판정
 internal/stages         8단계 + 공통 문맥 (원격 명령 기반 VM 접근)
-adapters/  cases/  testdata/  legacy-python/
+adapters/  cases/  testdata/
 ```

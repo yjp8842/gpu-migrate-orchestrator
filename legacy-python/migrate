@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# 파이썬 판(보관) 진입점 — 프로젝트 맨 위의 .venv 를 쓴다. 지금 쓰는 판은 맨 위의 Go 실행 파일 migrate 다.
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-py="$here/../.venv/bin/python"; [ -x "$py" ] || py=python3
-PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "$py" -m gmp.cli "$@"
