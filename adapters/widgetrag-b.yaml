@@ -18,6 +18,12 @@ logs:
   run: "~/tc-run.log"
   exit: "~/tc-run.exit"
 resume_unit: widgetrag-compose-resume
+# 판정 단계가 타겟에서 받아 run 폴더 verify/target/ 에 두는 것 — 판정과 무관하게 받는다 (테스트 이력)
+diagnostics:
+  - { name: services.log, command: "cd ~/widgetrag-deploy && sudo docker compose -f docker-compose.yml -f docker-compose.images.yml logs --no-color --timestamps | tail -n 50000" }
+  - { name: containers.txt, command: "cd ~/widgetrag-deploy && sudo docker compose -f docker-compose.yml -f docker-compose.images.yml ps -a" }
+  - { name: gpu.txt, command: "nvidia-smi; nvidia-smi --query-gpu=name,driver_version,memory.used,memory.total --format=csv" }
+  - { name: models.txt, command: "cd ~/widgetrag-deploy && sudo docker compose -f docker-compose.yml -f docker-compose.images.yml exec -T llm sh -c 'ollama list; ollama ps'" }
 services: [opensearch, llm, ai-server, backend, frontend]
 identify:
   compose: [~/widgetrag-deploy/docker-compose.yml, ~/widgetrag-deploy/docker-compose.images.yml]

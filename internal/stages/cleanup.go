@@ -1,6 +1,6 @@
 package stages
 
-// 8. cleanup — 타겟 정리(suspend · terminate · keep), summary.md.
+// 8. cleanup — 타겟 정리(suspend · terminate · keep). summary.md 는 단계 실행이 끝난 뒤 migrate 가 쓴다 (이 단계가 done 으로 적힌 뒤).
 
 import (
 	"gpu-migrate-orchestrator/internal/jsonx"
@@ -23,9 +23,6 @@ func runCleanup(ctx *Context) (M, error) {
 			infra = jsonx.S(tgt, "name")
 		}
 		ctx.Dry(stCleanup, "cleanup="+action, M{"infra": infra})
-		if err := WriteSummary(ctx); err != nil {
-			return nil, err
-		}
 		return M{"dry_run": true}, nil
 	}
 	tb, err := ctx.TBTarget()
@@ -60,9 +57,6 @@ func runCleanup(ctx *Context) (M, error) {
 		}
 		ctx.Log.Info(stCleanup, "타겟 %s terminate 요청", id)
 		done = "terminate"
-	}
-	if err := WriteSummary(ctx); err != nil {
-		return nil, err
 	}
 	return M{"action": done}, nil
 }

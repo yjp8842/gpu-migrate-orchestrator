@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -717,5 +718,117 @@ func TestTransferVerifyFailureResendsOnResume(t *testing.T) {
 	}
 	if len(fb.sent) != 2 || fb.sent[1] != first+"-2" || ctx.State.HasKey("beetle_data_verify_failed") || cmdsWith(tb, ".failed-1") != 1 {
 		t.Fatalf("대조에서 떨어진 이관을 다시 보내지 않았다: %v", fb.sent)
+	}
+}
+
+// ---------- 판정 단계의 타겟 상태 회수 ----------
+
+func TestDiagnosticsScript(t *testing.T) {
+	s, err := DiagnosticsScript([]M{{"name": "gpu.txt", "command": "nvidia-smi"}, {"name": "app-logs.tar.gz", "command": "tar -czf - -C ~/x logs"}}, `"$HOME/gmp-diag-r1"`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`d="$HOME/gmp-diag-r1"; mkdir -p "$d"`, `( nvidia-smi ) > "$d/gpu.txt" 2> "$d/gpu.txt.stderr" < /dev/null || true`, `"$d/app-logs.tar.gz"`, `-size 0 -delete`} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("스크립트에 %q 가 없다:\n%s", want, s)
+		}
+	}
+	for _, bad := range []M{{"name": "../x", "command": "id"}, {"name": "a/b", "command": "id"}, {"name": "ok.txt", "command": " "}} {
+		if _, err := DiagnosticsScript([]M{bad}, `"$HOME/d"`); err == nil {
+			t.Fatalf("잘못된 항목을 받아들였다: %v", bad)
+		}
+	}
+}
+
+func TestAdaptersDiagnosticsValid(t *testing.T) {
+	for _, name := range []string{"widgetrag-a", "widgetrag-b"} {
+		ad, err := config.LoadAdapter(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		items := jsonx.ListM(ad.Raw["diagnostics"])
+		if len(items) < 4 {
+			t.Fatalf("%s: diagnostics 가 %d개뿐이다", name, len(items))
+		}
+		if _, err := DiagnosticsScript(items, `"$HOME/d"`); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestCollectDiagnostics(t *testing.T) {
+	tb := &fakeTB{}
+	ctx := targetCtx(t, tb)
+	dir := "gmp-diag-" + ctx.State.Data.RunID
+	tb.cmdOut = func(cmd string) string {
+		switch {
+		case strings.Contains(cmd, "mkdir -p"):
+			return "gpu.txt\nmodels.txt\n" + rcMarker + "0\n"
+		case strings.Contains(cmd, "tar -C"):
+			return tarGzB64(t, map[string]string{dir + "/gpu.txt": "Tesla T4\n", dir + "/models.txt": "gemma3:4b\n"}) + "\n" + rcMarker + "0\n"
+		}
+		return rcMarker + "0\n"
+	}
+	collectDiagnostics(ctx)
+	got, err := os.ReadFile(filepath.Join(ctx.State.StageDir(stVerify), "target", "gpu.txt"))
+	if err != nil || string(got) != "Tesla T4\n" {
+		t.Fatalf("타겟 상태를 받지 못했다: %q %v", got, err)
+	}
+	if cmdsWith(tb, `$HOME/`+dir) != 1 || cmdsWith(tb, "~/"+dir) != 1 {
+		t.Fatalf("수집 · 회수 명령이 run 폴더 이름을 쓰지 않았다: %v", tb.cmds)
+	}
+	// 수집이 실패해도 멈추지 않는다 (판정은 그대로)
+	tb.cmdOut = func(string) string { return rcMarker + "1\n" }
+	collectDiagnostics(ctx)
+}
+
+func TestEvidenceDirScriptSkipsFiles(t *testing.T) {
+	dir := t.TempDir()
+	for _, d := range []string{"migration-20261022-010101", "migration-20261023-020921"} {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "migration-compare.csv"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command("bash", "-c", EvidenceDirScript(dir+"/migration-*")).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(out)); got != filepath.Join(dir, "migration-20261023-020921") {
+		t.Fatalf("증적 폴더 대신 %q 를 골랐다", got)
+	}
+	if out, _ := exec.Command("bash", "-c", EvidenceDirScript(t.TempDir()+"/migration-*")).Output(); strings.TrimSpace(string(out)) != "" {
+		t.Fatalf("폴더가 없는데 %q 를 골랐다", out)
+	}
+}
+
+// ---------- summary.md ----------
+
+func TestSummaryRewrittenAfterNoteAndFinalStatus(t *testing.T) {
+	ctx := newCtx(t, &fakeTB{}, nil, false)
+	read := func() string {
+		b, err := os.ReadFile(filepath.Join(ctx.RunDir, "summary.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	ctx.State.Mark("cleanup", "running", "", nil)
+	if err := WriteSummary(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); !strings.Contains(s, "| cleanup | running |") || !strings.Contains(s, "- 없음") {
+		t.Fatalf("처음 요약이 이상하다:\n%s", s)
+	}
+	ctx.State.Mark("cleanup", "done", "", nil)
+	ctx.State.Note("증적 폴더를 다시 받으려고 verify 재실행", "verify", "")
+	if err := Summarize(ctx.Case, ctx.State); err != nil {
+		t.Fatal(err)
+	}
+	s := read()
+	if !strings.Contains(s, "| cleanup | done |") || !strings.Contains(s, "[verify] 증적 폴더를 다시 받으려고 verify 재실행") || strings.Contains(s, "- 없음") {
+		t.Fatalf("note · 최종 상태가 요약에 반영되지 않았다:\n%s", s)
 	}
 }

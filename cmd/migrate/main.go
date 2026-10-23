@@ -3,7 +3,8 @@
 //	migrate run      --case cases/X.yaml [--resume RUN|latest] [--from 단계] [--to 단계] [--dry-run]
 //	migrate <단계>   --case cases/X.yaml [--run RUN|latest]       (collect · recommend · provision · package · transfer · start · verify · cleanup)
 //	migrate status   --case cases/X.yaml                          읽기 전용 — 소스 인프라 상태 · 최근 run 요약
-//	migrate note     --case cases/X.yaml [--stage 단계] "사람이 한 조치"   수동 개입 기록 (수작업 유발 구간 목록의 원천)
+//	migrate note     --case cases/X.yaml [--stage 단계] "사람이 한 조치"   수동 개입 기록 (수작업 유발 구간 목록의 원천) — summary.md 도 다시 쓴다
+//	migrate summary  --case cases/X.yaml [--run RUN|latest]       summary.md 만 다시 쓴다 (state.json 기준, 원격 호출 없음)
 //	migrate beetle-selftest                                       Beetle 데이터 이관 암호화 형식 자가 확인
 //
 // 공통: --settings settings.yaml (기본 프로젝트의 settings.yaml, 없으면 settings.example.yaml)
@@ -41,6 +42,7 @@ const usage = `migrate — GPU 추론서비스 이관 오케스트레이터
                    단계: collect recommend provision package transfer start verify cleanup
   migrate status   --case cases/X.yaml
   migrate note     --case cases/X.yaml [--run latest] [--stage 단계] "사람이 한 조치"
+  migrate summary  --case cases/X.yaml [--run latest]           summary.md 만 다시 쓴다
   migrate beetle-selftest
 
   공통: --settings settings.yaml
@@ -141,6 +143,8 @@ func run(argv []string) int {
 	case cmd == "note":
 		fs.StringVar(&o.runID, "run", "latest", "")
 		fs.StringVar(&o.noteStage, "stage", "", "")
+	case cmd == "summary":
+		fs.StringVar(&o.runID, "run", "latest", "")
 	case cmd == "beetle-selftest":
 	default:
 		fmt.Fprintf(os.Stderr, "[migrate] 모르는 명령: %s\n\n%s", cmd, usage)
@@ -175,6 +179,8 @@ func run(argv []string) int {
 		rc, err = cmdStatus(o)
 	case cmd == "note":
 		rc, err = cmdNote(o)
+	case cmd == "summary":
+		rc, err = cmdSummary(o)
 	case cmd == "beetle-selftest":
 		rc, err = cmdSelftest(o)
 	}
@@ -358,6 +364,10 @@ func cmdRun(o opts) (int, error) {
 	log.Info("", "run %s · 사례 %s · 단계 %s%s", st.Data.RunID, c.Name, strings.Join(names, " → "), dry)
 	log.Info("", "증적: %s", st.RunDir)
 	rc := execute(ctx, names)
+	// 요약은 단계 상태가 모두 적힌 뒤에 쓴다 — 실패로 멈춘 run 도 그 시점의 요약이 남는다
+	if err := stages.WriteSummary(ctx); err != nil {
+		log.Warn("", "summary.md 를 쓰지 못했습니다: %v", err)
+	}
 	for _, l := range st.SummaryLines() {
 		fmt.Println(l)
 	}
@@ -432,6 +442,37 @@ func cmdNote(o opts) (int, error) {
 	}
 	st.Note(o.text, o.noteStage, "")
 	fmt.Printf("기록됨: run %s — %s\n", rid, o.text)
+	if err := stages.Summarize(c, st); err != nil {
+		fmt.Fprintln(os.Stderr, "summary.md 를 다시 쓰지 못했습니다:", err)
+	}
+	return 0, nil
+}
+
+// cmdSummary 는 state.json 으로 summary.md 만 다시 쓴다 (원격 호출 없음).
+func cmdSummary(o opts) (int, error) {
+	s, err := config.LoadSettings(o.settings)
+	if err != nil {
+		return 2, err
+	}
+	c, err := config.LoadCase(o.casePath)
+	if err != nil {
+		return 2, err
+	}
+	rid := o.runID
+	if rid == "" || rid == "latest" {
+		rid = state.LatestRunID(s.EvidenceRoot, c.Name)
+	}
+	if rid == "" {
+		return 2, fmt.Errorf("%s 의 run 이 없습니다", c.Name)
+	}
+	st, err := state.Open(s.EvidenceRoot, c.Name, rid)
+	if err != nil {
+		return 2, err
+	}
+	if err := stages.Summarize(c, st); err != nil {
+		return 2, err
+	}
+	fmt.Printf("다시 씀: %s\n", filepath.Join(st.RunDir, "summary.md"))
 	return 0, nil
 }
 

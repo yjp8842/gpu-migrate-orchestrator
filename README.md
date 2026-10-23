@@ -37,7 +37,8 @@ cp .env.example .env
 | `run --case … --from start --to verify` | 단계 범위만 (지정한 단계는 done 이어도 다시) |
 | `verify --case … --run latest` | 단계 하나만 |
 | `status --case …` | 읽기 전용 — 소스 인프라 상태 · 최근 run |
-| `note --case … --stage provision "VPC 한도 상향 신청"` | 사람이 한 조치 기록 (수동 개입 구간 목록의 원천) |
+| `note --case … --stage provision "VPC 한도 상향 신청"` | 사람이 한 조치 기록 (수동 개입 구간 목록의 원천) — `summary.md` 도 다시 쓴다 |
+| `summary --case … --run latest` | `summary.md` 만 다시 쓴다 (`state.json` 기준, 원격 호출 없음). `run` 은 단계 실행이 끝날 때마다 다시 쓴다 |
 | `beetle-selftest` | Beetle 데이터 이관 암호화 형식 확인 |
 
 `--settings` 는 하위 명령 앞뒤 어디에 써도 된다. 종료 코드는 0 정상 · 1 판정 FAIL 또는 NO-RESULT · 2 오류다.
@@ -55,7 +56,7 @@ cp .env.example .env
 ## 사례 · 어댑터 · 설정
 
 - `cases/*.yaml` — 이번 운행에서 바뀌는 값만: 소스 인프라, 타겟 CSP · 리전 · provider(beetle | tumblebug), 정책(GPU 선택 · 이미지 · 드라이버 시리즈 · 디스크 · 열 포트), 이관 방식(기본 beetle), run.env, cleanup.
-- `adapters/*.yaml` — 워크로드가 다른 점 전부: 단일 명령, 재기동 · 패키지 생성 명령, 패키지 경로, 결과 파일 위치, 기동 로그 위치, 재개 유닛, 상태 확인 위치. WidgetRAG 두 벌은 채워져 있고 LexAI 두 벌은 자리만 있다. 명령 템플릿의 `{env}` 는 사례 `run.env` 전체(타겟 단일 명령용)이고, `{source_env}` 는 그중 `LLM_TEMPERATURE` · `LLM_SEED` 만이다(소스 재기동용 — `CODE_SOURCE` · `COMPARE` · `FORM` · 비밀번호는 소스에 넘기지 않는다).
+- `adapters/*.yaml` — 워크로드가 다른 점 전부: 단일 명령, 재기동 · 패키지 생성 명령, 패키지 경로, 결과 파일 위치, 기동 로그 위치, 재개 유닛, 상태 확인 위치. WidgetRAG 두 벌은 채워져 있고 LexAI 두 벌은 자리만 있다. `diagnostics` 는 판정 단계가 타겟에서 받아 `verify/target/` 에 두는 것(파일 이름 · 명령)이다. 명령 템플릿의 `{env}` 는 사례 `run.env` 전체(타겟 단일 명령용)이고, `{source_env}` 는 그중 `LLM_TEMPERATURE` · `LLM_SEED` 만이다(소스 재기동용 — `CODE_SOURCE` · `COMPARE` · `FORM` · 비밀번호는 소스에 넘기지 않는다).
 - `settings.example.yaml` — Tumblebug(이름별) · Beetle 주소와 계정, 증적 루트, 제한 시간, 호출 간격. 주소 · 계정은 환경변수로 받으므로 대개 그대로 쓴다. 고쳐 쓰려면 `settings.yaml` 로 복사한다 (gitignore, 있으면 이쪽을 먼저 읽는다).
 
 ## 환경변수
@@ -72,7 +73,7 @@ cp .env.example .env
 | `GMP_ROOT` | 실행 파일 (선택) | 프로젝트 폴더 |
 
 증적은 `evidence_root/<사례>/<run-id>/` 에 쌓인다: `state.json`(단계 상태 · 재개용 키 · 개입 기록 · 판정) · `log.txt` · `http.jsonl`(요청 요약, 본문은 해시) ·
-`collect/source-model.json` · `recommend/rationale.md` · `package/identify.json` · `transfer/verify-remote.txt` · `start/tc-run.log` · `verify/verdict.json` · `summary.md`.
+`collect/source-model.json` · `recommend/rationale.md` · `package/identify.json` · `transfer/verify-remote.txt` · `start/tc-run.log` · `verify/verdict.json` · `verify/target/`(타겟 서비스 로그 · 앱 로그 · GPU · 모델 상태 — 판정과 무관하게 받는다) · `summary.md`.
 
 ## 알아 둘 것
 

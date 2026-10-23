@@ -1,6 +1,7 @@
 package stages
 
 // run/summary.md — 단계 시각 · 선택 근거 · 판정 · 사람이 개입한 기록을 한 장으로.
+// state.json 만으로 다시 만들 수 있다. 단계 실행이 끝날 때마다(성공 · 실패 모두), note 를 남길 때마다, migrate summary 로 다시 쓴다.
 
 import (
 	"fmt"
@@ -10,13 +11,17 @@ import (
 
 	"gpu-migrate-orchestrator/internal/config"
 	"gpu-migrate-orchestrator/internal/jsonx"
+	"gpu-migrate-orchestrator/internal/state"
 	"gpu-migrate-orchestrator/internal/textx"
 )
 
 // WriteSummary 는 run 폴더에 summary.md 를 쓴다.
-func WriteSummary(ctx *Context) error {
-	st := ctx.State.Data
-	src, tgt := ctx.Case.Source(), ctx.Case.Target()
+func WriteSummary(ctx *Context) error { return Summarize(ctx.Case, ctx.State) }
+
+// Summarize 는 사례와 run 상태만으로 summary.md 를 다시 쓴다.
+func Summarize(c *config.Case, rs *state.RunState) error {
+	st := rs.Data
+	src, tgt := c.Source(), c.Target()
 	head := fmt.Sprintf("# %s — run %s", st.Case, st.RunID)
 	if st.DryRun {
 		head += " (DRY-RUN)"
@@ -26,7 +31,7 @@ func WriteSummary(ctx *Context) error {
 		fmt.Sprintf("- 생성: %s · 갱신: %s", st.Created, st.Updated), "",
 		"## 단계", "", "| 단계 | 상태 | 시작 | 끝 | 비고 |", "| --- | --- | --- | --- | --- |"}
 	for _, n := range config.Stages {
-		s := ctx.State.Stage(n)
+		s := rs.Stage(n)
 		lines = append(lines, fmt.Sprintf("| %s | %s | %s | %s | %s |", n, s.Status, textx.Head(s.Started, 19), textx.Head(s.Ended, 19), textx.Head(s.Error, 80)))
 	}
 	v := jsonx.AsM(st.Verdict)
@@ -58,7 +63,7 @@ func WriteSummary(ctx *Context) error {
 			lines = append(lines, fmt.Sprintf("- %s: %s", k, string(b)))
 		}
 	}
-	if b, err := os.ReadFile(filepath.Join(ctx.RunDir, "recommend", "rationale.md")); err == nil {
+	if b, err := os.ReadFile(filepath.Join(rs.RunDir, "recommend", "rationale.md")); err == nil {
 		lines = append(lines, "", "## 추천 · 선택 근거", "")
 		for _, l := range strings.Split(strings.TrimRight(string(b), "\n"), "\n") {
 			if !strings.HasPrefix(l, "# ") {
@@ -77,5 +82,5 @@ func WriteSummary(ctx *Context) error {
 		}
 		lines = append(lines, fmt.Sprintf("- %s [%s] %s", textx.Head(n.At, 19), stage, n.Text))
 	}
-	return os.WriteFile(filepath.Join(ctx.RunDir, "summary.md"), []byte(strings.Join(lines, "\n")+"\n"), 0o644)
+	return os.WriteFile(filepath.Join(rs.RunDir, "summary.md"), []byte(strings.Join(lines, "\n")+"\n"), 0o644)
 }
