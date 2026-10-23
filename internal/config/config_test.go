@@ -20,7 +20,7 @@ func caseEnv(t *testing.T) {
 
 func TestCasesAndAdaptersLoad(t *testing.T) {
 	caseEnv(t)
-	for _, name := range []string{"aws-to-aws-widgetrag-a", "aws-to-aws-widgetrag-a-beetle", "aws-to-gcp-widgetrag-a"} {
+	for _, name := range []string{"aws-to-aws-widgetrag-a", "aws-to-aws-widgetrag-a-beetle", "aws-to-gcp-widgetrag-a", "aws-to-aws-lexai-a", "aws-to-gcp-lexai-a"} {
 		c, err := LoadCase(filepath.Join(root(t), "cases", name+".yaml"))
 		if err != nil {
 			t.Fatal(err)
