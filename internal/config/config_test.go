@@ -20,7 +20,7 @@ func caseEnv(t *testing.T) {
 
 func TestCasesAndAdaptersLoad(t *testing.T) {
 	caseEnv(t)
-	for _, name := range []string{"aws-to-aws-widgetrag-a", "aws-to-gcp-widgetrag-a"} {
+	for _, name := range []string{"aws-to-aws-widgetrag-a", "aws-to-aws-widgetrag-a-beetle", "aws-to-gcp-widgetrag-a"} {
 		c, err := LoadCase(filepath.Join(root(t), "cases", name+".yaml"))
 		if err != nil {
 			t.Fatal(err)
@@ -53,6 +53,43 @@ func TestCaseMissingEnvNamed(t *testing.T) {
 	_, err := LoadCase(filepath.Join(root(t), "cases", "aws-to-aws-widgetrag-a.yaml"))
 	if err == nil || !strings.Contains(err.Error(), "GMP_VERIFY_ADMIN_PASSWORD, GMP_WEB_ALLOW_CIDR") {
 		t.Fatalf("빈 환경변수를 이름으로 알리지 않았다: %v", err)
+	}
+}
+
+// 샘플은 채울 줄이 비어 있어 그대로는 멈추고, 채우면 기본값 그대로 읽힌다.
+func TestCaseSample(t *testing.T) {
+	caseEnv(t)
+	path := filepath.Join(root(t), "cases", "case.sample.yaml")
+	if _, err := LoadCase(path); err == nil || !strings.Contains(err.Error(), "'case'") {
+		t.Fatalf("빈 샘플이 멈추지 않았다: %v", err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fill := map[string]string{"case:": "case: sample-filled", "workload:": "workload: widgetrag-a", "  infra:": "  infra: src",
+		"  csp:": "  csp: aws", "  region:": "  region: ap-northeast-2", "  name:": "  name: wr"}
+	lines := strings.Split(string(b), "\n")
+	for i, l := range lines {
+		for k, v := range fill {
+			if strings.HasPrefix(l, k+" ") && strings.Contains(l, "# 채움") {
+				lines[i] = v
+			}
+		}
+	}
+	filled := filepath.Join(t.TempDir(), "sample-filled.yaml")
+	if err := os.WriteFile(filled, []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadCase(filled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Target()["provider"] != "beetle" || c.Policy()["driver_series"] != "595" || c.Cleanup() != "suspend" {
+		t.Fatalf("샘플 기본값: %v %v %v", c.Target()["provider"], c.Policy()["driver_series"], c.Cleanup())
+	}
+	if _, err := LoadAdapter(c.Raw["workload"].(string)); err != nil {
+		t.Fatal(err)
 	}
 }
 
