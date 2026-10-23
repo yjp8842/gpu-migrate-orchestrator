@@ -443,3 +443,15 @@ func TestSourceImageWant(t *testing.T) {
 		}
 	}
 }
+
+func TestTransferCreatesTargetParent(t *testing.T) {
+	ok := true
+	ctx, tb, _ := transferCtx(t, &ok)
+	ctx.Adapter = adapterWith(t, M{"package_dir": "~/x-backup/latest"})
+	if _, err := runTransfer(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if cmdsWith(tb, "mkdir -p ~/x-backup") == 0 {
+		t.Fatal("타겟 상위 폴더를 먼저 만들지 않았다", tb.cmds)
+	}
+}

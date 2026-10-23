@@ -9,6 +9,7 @@ package stages
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"gpu-migrate-orchestrator/internal/config"
@@ -137,6 +138,12 @@ func runTransfer(ctx *Context) (M, error) {
 			if listing := strings.TrimSpace(r.Stdout); listing != "" {
 				return nil, Errf("타겟 %s 가 비어 있지 않습니다 (%s) — 묵은 패키지(.restored 포함)는 적재를 건너뛰게 하므로 비운 뒤 다시: rm -rf %s",
 					it.To, strings.ReplaceAll(listing, "\n", " "), it.To)
+			}
+		}
+		// rsync 는 대상 경로의 마지막 폴더만 만든다 — 상위 폴더가 없으면 "mkdir … failed: No such file or directory" (10/23 실 운행)
+		if parent := path.Dir(strings.TrimRight(it.To, "/")); parent != "." && parent != "/" && parent != "~" {
+			if _, err := ctx.ExecOK("target", "mkdir -p "+textx.RemotePath(parent), 2); err != nil {
+				return nil, err
 			}
 		}
 		if err := transferItemViaBeetle(ctx, i, it); err != nil {

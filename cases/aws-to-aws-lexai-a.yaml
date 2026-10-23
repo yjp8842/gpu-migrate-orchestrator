@@ -4,7 +4,7 @@ workload: lexai-a
 source:
   tumblebug: default
   ns: default
-  infra: lexai-shell-aws              # MapUI 로 만든 소스 (Running · 데이터 적재 끝이어야 실제 실행 가능 — 10/23 현재 Terminated)
+  infra: lexai-src-aws                # MapUI 로 만든 소스 (Running · 데이터 적재 끝)
 target:
   provider: beetle
   tumblebug: default
@@ -20,7 +20,7 @@ policy:
   image: source                      # 소스와 같은 OS · 버전 (LexAI 소스는 Ubuntu 22.04)
   root_disk_gb: 100
   open_ports:
-    - { port: 80, cidr: "${GMP_WEB_ALLOW_CIDR}" }
+    - { port: 3000, cidr: "${GMP_WEB_ALLOW_CIDR}" }   # 네이티브 LexAI 프론트엔드는 3000 (80 아님)
   on_perf_fail: stop
 transfer:
   method: beetle
@@ -29,4 +29,4 @@ run:
   env: {}
   timeout_start_min: 75
   on_existing: stop
-cleanup: suspend
+cleanup: keep

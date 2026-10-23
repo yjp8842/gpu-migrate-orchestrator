@@ -94,3 +94,16 @@ func TestLiveRecommend(t *testing.T) {
 		t.Fatal(changes)
 	}
 }
+
+func TestAdjustCandidateNarrowsSubnetEqualToVNet(t *testing.T) {
+	cand := M{"targetInfra": M{"nodeGroups": []any{}}, "targetVNet": M{"cidrBlock": "10.2.0.0/16",
+		"subnetInfoList": []any{M{"name": "subnet-01", "ipv4_CIDR": "10.2.0.0/16"}, M{"name": "subnet-02", "ipv4_CIDR": "10.2.64.0/18"}}}}
+	c, changes := AdjustCandidate(cand, M{}, "", nil, nil)
+	sn := jsonx.ListM(jsonx.AsM(c["targetVNet"])["subnetInfoList"])
+	if jsonx.S(sn[0], "ipv4_CIDR") != "10.2.0.0/18" || jsonx.S(sn[1], "ipv4_CIDR") != "10.2.64.0/18" || len(changes) != 1 {
+		t.Fatal(sn, changes)
+	}
+	if jsonx.S(jsonx.ListM(jsonx.AsM(cand["targetVNet"])["subnetInfoList"])[0], "ipv4_CIDR") != "10.2.0.0/16" {
+		t.Fatal("원본 후보를 바꿨다")
+	}
+}
