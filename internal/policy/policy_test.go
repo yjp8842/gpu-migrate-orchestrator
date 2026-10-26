@@ -79,6 +79,9 @@ func TestLiveRecommend(t *testing.T) {
 	if ok, _ := ImageFits(img, "ubuntu-24.04", "580"); ok {
 		t.Fatal("580 을 받았다")
 	}
+	if ok, why := ImageFits(img, "ubuntu-24.04", ""); !ok || !strings.Contains(why, "지정 없음") {
+		t.Fatal("드라이버 시리즈를 비우면 GPU 이미지를 그대로 써야 한다", why)
+	}
 	if ok, _ := ImageFits(img, "ubuntu-22.04", "595"); ok {
 		t.Fatal("22.04 를 받았다")
 	}

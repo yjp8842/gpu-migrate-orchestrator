@@ -574,8 +574,8 @@ func NewCase(path string, r jsonx.M, envOrder []string) (*Case, error) {
 	if err := enum(setDefault(pol, "gpu", "same-model-first"), []string{"same-model-first", "vram-at-least"}, "policy.gpu"); err != nil {
 		return nil, err
 	}
-	setDefault(pol, "image", "source")      // 소스와 같은 OS · 버전. 바꾸려면 'ubuntu-24.04' 처럼 적는다 (keep = Beetle 추천 그대로)
-	setDefault(pol, "driver_series", "595") // 워크로드 bootstrap 의 NVIDIA_DRIVER_SERIES 와 같게
+	setDefault(pol, "image", "source")   // 소스와 같은 OS · 버전. 바꾸려면 'ubuntu-24.04' 처럼 적는다 (keep = Beetle 추천 그대로)
+	setDefault(pol, "driver_series", "") // 비우면 추천 GPU 이미지를 드라이버 버전과 상관없이 그대로 (워크로드 기본도 ubuntu-drivers 추천판). '595' 처럼 적으면 그 시리즈가 내장된 이미지만 그대로
 	setDefault(pol, "root_disk_gb", 100)
 	setDefault(pol, "open_ports", []any{})
 	if err := enum(setDefault(pol, "on_perf_fail", "stop"), []string{"stop", "next-candidate"}, "policy.on_perf_fail"); err != nil {

@@ -85,7 +85,7 @@ func TestCaseSample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Target()["provider"] != "beetle" || c.Policy()["driver_series"] != "595" || c.Cleanup() != "suspend" {
+	if c.Target()["provider"] != "beetle" || c.Policy()["driver_series"] != "" || c.Cleanup() != "suspend" {
 		t.Fatalf("샘플 기본값: %v %v %v", c.Target()["provider"], c.Policy()["driver_series"], c.Cleanup())
 	}
 	if _, err := LoadAdapter(c.Raw["workload"].(string)); err != nil {
@@ -132,7 +132,7 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Transfer()["method"] != "beetle" || c.Policy()["driver_series"] != "595" || c.Target()["ns"] != "default" || c.Cleanup() != "suspend" {
+	if c.Transfer()["method"] != "beetle" || c.Policy()["driver_series"] != "" || c.Target()["ns"] != "default" || c.Cleanup() != "suspend" {
 		t.Fatalf("기본값: %v %v", c.Transfer(), c.Policy())
 	}
 }

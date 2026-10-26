@@ -3,7 +3,7 @@
 // 실증의 소스는 모두 Tumblebug 로 만든다는 전제에서, 추천에 필요한 소스 사양은 Tumblebug 가 이미 안다 —
 // 노드(디스크 · 사설 IP · CSP 자원 ID) · 스펙(vCPU · 메모리 · GPU) · 이미지(OS) · vNet(CIDR) · 보안 그룹(규칙).
 // VM 에 들어가지 않으므로 소스가 중지돼 있어도, 종료된 뒤 기록이 남아 있어도 만들 수 있다.
-// 메타에 없는 값 — 설치된 GPU 드라이버 버전 — 은 정책의 driver_series(워크로드가 고정 설치하는 시리즈)로 채운다.
+// 메타에 없는 값 — 설치된 GPU 드라이버 버전 — 은 정책의 driver_series(적었을 때만, 비우면 빈 값)로 채운다.
 package sourcemodel
 
 import (

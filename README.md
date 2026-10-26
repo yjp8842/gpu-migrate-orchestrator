@@ -55,7 +55,7 @@ cp .env.example .env
 
 ## 사례 · 어댑터 · 설정
 
-- `cases/*.yaml` — 이번 운행에서 바뀌는 값만: 소스 인프라, 타겟 CSP · 리전 · provider(beetle | tumblebug), 정책(GPU 선택 · 이미지(기본 `source` = 소스와 같은 OS · 버전, `ubuntu-24.04` 처럼 지정 가능, `keep` = Beetle 추천 그대로) · 드라이버 시리즈 · 디스크 · 열 포트), 이관 방식(기본 beetle), run.env, cleanup. 새 이관 조합은 `cases/case.sample.yaml` 을 복사해 만든다 — 조합마다 바꾸는 값(소스 인프라 · 타겟 CSP · 리전 · 이름 등)은 비어 있고 주석에 예시가 있다.
+- `cases/*.yaml` — 이번 운행에서 바뀌는 값만: 소스 인프라, 타겟 CSP · 리전 · provider(beetle | tumblebug), 정책(GPU 선택 · 이미지(기본 `source` = 소스와 같은 OS · 버전, `ubuntu-24.04` 처럼 지정 가능, `keep` = Beetle 추천 그대로) · 드라이버 시리즈(기본 비움 — 추천 GPU 이미지를 드라이버 버전과 상관없이 그대로, `"595"` 처럼 적으면 그 시리즈가 내장된 이미지만) · 디스크 · 열 포트), 이관 방식(기본 beetle), run.env, cleanup. 새 이관 조합은 `cases/case.sample.yaml` 을 복사해 만든다 — 조합마다 바꾸는 값(소스 인프라 · 타겟 CSP · 리전 · 이름 등)은 비어 있고 주석에 예시가 있다.
 - `adapters/*.yaml` — 워크로드가 다른 점 전부 (아래 「어댑터 항목」). 도구 코드는 워크로드를 모르고, 새 서비스는 어댑터 한 장으로 붙인다. WidgetRAG 두 벌(결과표로 판정)과 LexAI 두 벌(상태 파일 `~/lexai-run/status.json` 으로 판정, 전송 2건: 패키지 + 저장소 · 배포 디렉터리)이 채워져 있다. `diagnostics` 는 판정 단계가 타겟에서 받아 `verify/target/` 에 두는 것(파일 이름 · 명령)이다. 명령 템플릿의 `{env}` 는 사례 `run.env` 전체(타겟 단일 명령용)이고, `{source_env}` 는 그중 `LLM_TEMPERATURE` · `LLM_SEED` 만이다(소스 재기동용 — `CODE_SOURCE` · `COMPARE` · `FORM` · 비밀번호는 소스에 넘기지 않는다).
 - `settings.example.yaml` — Tumblebug(이름별) · Beetle 주소와 계정, 증적 루트, 제한 시간, 호출 간격. 주소 · 계정은 환경변수로 받으므로 대개 그대로 쓴다. 고쳐 쓰려면 `settings.yaml` 로 복사한다 (gitignore, 있으면 이쪽을 먼저 읽는다).
 
