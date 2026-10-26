@@ -16,6 +16,7 @@ import (
 
 	"gpu-migrate-orchestrator/internal/config"
 	"gpu-migrate-orchestrator/internal/jsonx"
+	"gpu-migrate-orchestrator/internal/logx"
 	"gpu-migrate-orchestrator/internal/textx"
 )
 
@@ -199,13 +200,15 @@ func (s *RunState) Load() error {
 	return nil
 }
 
-// Save 는 임시 파일에 쓴 뒤 바꿔치기한다.
+// Save 는 임시 파일에 쓴 뒤 바꿔치기한다. 비밀값(검증용 비밀번호 · 키)은 가려서 쓴다 — state.json 은 증적으로 나간다.
+// 가린 값은 다시 읽어 쓰지 않는다 (start_launched.entry 는 기록용이고, 재개는 키가 있는지만 본다).
 func (s *RunState) Save() error {
 	s.Data.Updated = now()
 	b, err := jsonx.Marshal(s.Data, true)
 	if err != nil {
 		return err
 	}
+	b = []byte(logx.Mask(string(b)))
 	tmp := s.Path + ".tmp"
 	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
 		return err
