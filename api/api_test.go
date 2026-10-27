@@ -65,8 +65,38 @@ func TestBuildCase(t *testing.T) {
 	}
 }
 
+func TestInfraStatus(t *testing.T) {
+	for in, want := range map[string]string{"Running:1 (R:1/1)": "Running", "Suspended:1 (S:1/1)": "Suspended", "Failed": "Failed", "": "Unknown"} {
+		if got := infraStatus(M{"status": in}); got != want {
+			t.Errorf("%q → %q, 기대 %q", in, got, want)
+		}
+	}
+	if infraStatus(nil) != "NotFound" {
+		t.Error("없는 인프라")
+	}
+}
+
+func TestBuildCaseOpenPorts(t *testing.T) {
+	in := baseInput()
+	rules := []portInput{{Port: 80, CIDR: MyIPCIDR}, {Port: 8080, CIDR: " 10.20.0.0/16 "}}
+	in.Policy.OpenPorts = &rules
+	_, doc, err := buildCase(in, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := doc.Policy.OpenPorts; len(got) != 2 || got[0].CIDR != MyIPCIDR || got[1] != (portDoc{Port: 8080, CIDR: "10.20.0.0/16"}) {
+		t.Fatalf("열 포트 %+v", got)
+	}
+	none := []portInput{}
+	in.Policy.OpenPorts = &none
+	if _, doc, _ = buildCase(in, time.Now()); len(doc.Policy.OpenPorts) != 0 {
+		t.Fatalf("빈 목록이면 열지 않아야 함: %+v", doc.Policy.OpenPorts)
+	}
+}
+
 func TestBuildCaseRejects(t *testing.T) {
 	disk := 5.0
+	ports := func(r ...portInput) func(*caseInput) { return func(c *caseInput) { c.Policy.OpenPorts = &r } }
 	cases := map[string]func(*caseInput){
 		"모르는 워크로드":    func(c *caseInput) { c.Workload = "x" },
 		"타겟 이름":       func(c *caseInput) { c.Name = "WR GCP" },
@@ -78,6 +108,11 @@ func TestBuildCaseRejects(t *testing.T) {
 		"정리는":         func(c *caseInput) { c.Policy.Cleanup = "delete" },
 		"sourceInfra": func(c *caseInput) { c.SourceInfra = "" },
 		"네임스페이스":      func(c *caseInput) { c.NS = "../ns" },
+		"1~65535":     ports(portInput{Port: 0, CIDR: MyIPCIDR}),
+		"너무 넓습니다":     ports(portInput{Port: 80, CIDR: "0.0.0.0/0"}),
+		"네트워크 주소로":    ports(portInput{Port: 80, CIDR: "10.20.1.5/16"}),
+		"IPv4 대역":     ports(portInput{Port: 80, CIDR: "$(id)"}),
+		"겹칩니다":        ports(portInput{Port: 80, CIDR: "10.0.0.1/32"}, portInput{Port: 80, CIDR: "10.0.0.1/32"}),
 	}
 	for want, mod := range cases {
 		in := baseInput()
@@ -90,6 +125,11 @@ func TestBuildCaseRejects(t *testing.T) {
 
 func TestWriteReadCase(t *testing.T) {
 	root := t.TempDir()
+	t.Setenv("GMP_WEB_ALLOW_CIDR", "")
+	if _, _, err := writeCase(root, baseInput()); err == nil || !strings.Contains(err.Error(), "GMP_WEB_ALLOW_CIDR") {
+		t.Fatalf(".env 값 없이 「내 IP」를 받으면 안 됨: %v", err)
+	}
+	t.Setenv("GMP_WEB_ALLOW_CIDR", "203.0.113.254/32")
 	name, rel, err := writeCase(root, baseInput())
 	if err != nil {
 		t.Fatal(err)
@@ -330,6 +370,7 @@ func TestNamespace(t *testing.T) {
 		t.Fatalf("고른 네임스페이스: %v %+v %+v", err, doc.Source, doc.Target)
 	}
 	root := t.TempDir()
+	t.Setenv("GMP_WEB_ALLOW_CIDR", "203.0.113.254/32")
 	name, _, err := writeCase(root, in)
 	if err != nil {
 		t.Fatal(err)

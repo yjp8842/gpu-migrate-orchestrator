@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -131,7 +132,61 @@ type caseInput struct {
 		RootDiskGB *float64 `json:"root_disk_gb"`
 		Strategy   string   `json:"strategy"`
 		Cleanup    string   `json:"cleanup"`
+		// OpenPorts 가 없으면(null) 워크로드 포트 하나를 내 IP(.env GMP_WEB_ALLOW_CIDR)에만 연다. 빈 목록이면 열지 않는다.
+		OpenPorts *[]portInput `json:"open_ports"`
 	} `json:"policy"`
+}
+
+// portInput 은 열 포트 규칙 하나 — cidr 가 MyIPCIDR 이면 콘솔 PC .env 의 GMP_WEB_ALLOW_CIDR 로 채워진다.
+type portInput struct {
+	Port float64 `json:"port"`
+	CIDR string  `json:"cidr"`
+}
+
+// MyIPCIDR 는 사례 파일에 그대로 남는 자리표시자다 — migrate 가 실행할 때 .env 값으로 바꾼다.
+const MyIPCIDR = "${GMP_WEB_ALLOW_CIDR}"
+
+const (
+	maxPortRules  = 10
+	minCIDRPrefix = 16 // 이보다 넓은 대역(예: 0.0.0.0/0)은 받지 않는다 — 웹 포트를 인터넷 전체에 여는 일을 막는다
+)
+
+// openPorts 는 열 포트 규칙을 검사해 사례 형식으로 바꾼다. 출발지는 IPv4 대역(네트워크 주소로 적은 것)이나 MyIPCIDR 만 받는다.
+func openPorts(in *[]portInput, defPort int) ([]portDoc, error) {
+	if in == nil {
+		return []portDoc{{Port: defPort, CIDR: MyIPCIDR}}, nil
+	}
+	if len(*in) > maxPortRules {
+		return nil, fmt.Errorf("추가 열 포트 규칙은 %d개까지", maxPortRules)
+	}
+	out := []portDoc{}
+	seen := map[string]bool{}
+	for _, r := range *in {
+		if r.Port != float64(int(r.Port)) || r.Port < 1 || r.Port > 65535 {
+			return nil, fmt.Errorf("추가 열 포트 번호는 1~65535 정수")
+		}
+		cidr := strings.TrimSpace(r.CIDR)
+		if cidr != MyIPCIDR {
+			ip, n, err := net.ParseCIDR(cidr)
+			if err != nil || ip.To4() == nil {
+				return nil, fmt.Errorf("추가 열 포트 출발지 %q 는 IPv4 대역(예: 203.0.113.10/32)으로 적습니다", r.CIDR)
+			}
+			if !ip.Equal(n.IP) {
+				return nil, fmt.Errorf("추가 열 포트 출발지 %q 는 네트워크 주소로 적습니다 (%s)", r.CIDR, n.String())
+			}
+			if ones, _ := n.Mask.Size(); ones < minCIDRPrefix {
+				return nil, fmt.Errorf("추가 열 포트 출발지 %q 는 너무 넓습니다 — /%d 이상으로 좁혀 적습니다", r.CIDR, minCIDRPrefix)
+			}
+			cidr = n.String()
+		}
+		key := fmt.Sprintf("%d %s", int(r.Port), cidr)
+		if seen[key] {
+			return nil, fmt.Errorf("추가 열 포트 규칙이 겹칩니다: %d ← %s", int(r.Port), cidr)
+		}
+		seen[key] = true
+		out = append(out, portDoc{Port: int(r.Port), CIDR: cidr})
+	}
+	return out, nil
 }
 
 var (
@@ -203,6 +258,10 @@ func buildCase(in caseInput, now time.Time) (string, caseDoc, error) {
 	case disk != float64(int(disk)) || disk < 30 || disk > 2000:
 		return "", caseDoc{}, fmt.Errorf("루트 디스크는 30~2000GB 정수")
 	}
+	ports, err := openPorts(p.OpenPorts, wl.Port)
+	if err != nil {
+		return "", caseDoc{}, err
+	}
 	name := strings.ToLower(fmt.Sprintf("%s-to-%s-%s-%s", in.SourceCSP, in.CSP, in.Workload, now.Format("01021504")))
 	var zone *string
 	if in.Zone != "" {
@@ -214,7 +273,7 @@ func buildCase(in caseInput, now time.Time) (string, caseDoc, error) {
 		Source: srcDoc{Tumblebug: "default", NS: ns, Infra: in.SourceInfra},
 		Target: tgtDoc{Provider: "beetle", Tumblebug: "default", CSP: in.CSP, Region: strings.ToLower(in.Region), Zone: zone, NS: ns, Name: in.Name},
 		Policy: polDoc{GPU: gpu, Image: image, DriverSeries: "", RootDiskGB: int(disk),
-			OpenPorts: []portDoc{{Port: wl.Port, CIDR: "${GMP_WEB_ALLOW_CIDR}"}}, OnPerfFail: "stop"},
+			OpenPorts: ports, OnPerfFail: "stop"},
 		Transfer: xferDoc{Method: "beetle", Strategy: strategy},
 		Run:      wl.run,
 		Cleanup:  cleanup,
@@ -246,6 +305,11 @@ func writeCase(root string, in caseInput) (name, rel string, err error) {
 	name, doc, err := buildCase(in, time.Now())
 	if err != nil {
 		return "", "", err
+	}
+	for _, p := range doc.Policy.OpenPorts {
+		if p.CIDR == MyIPCIDR && os.Getenv("GMP_WEB_ALLOW_CIDR") == "" {
+			return "", "", fmt.Errorf("추가 열 포트 출발지가 「내 IP」인데 .env 에 GMP_WEB_ALLOW_CIDR 가 없습니다 — .env 에 적거나 대역을 직접 입력합니다")
+		}
 	}
 	b, err := caseYAML(doc)
 	if err != nil {

@@ -8,9 +8,9 @@
 //	GET  /api/namespaces                     Tumblebug 네임스페이스 (default 가 맨 앞)
 //	GET  /api/sources?ns=                    그 네임스페이스의 Tumblebug 인프라 (소스 후보, 기본 default)
 //	GET  /api/regions                        CSP 별 리전 · 존 (Tumblebug 연결)
-//	POST /api/preview                        사례 파일 만들기 + dry-run → run-id   (화면의 「다음 단계」)
-//	GET  /api/cases/{case}                   고른 값 (사례 원문은 내보내지 않음)
-//	POST /api/migrate                        이관 시작 (기본 --to verify — 정리 앞에서 멈춤) → run-id
+//	POST /api/preview                        사례 파일 만들기 + dry-run → run-id   (화면의 「사양 추천 받기」)
+//	GET  /api/cases/{case}                   고른 값 + 소스의 지금 상태 (사례 원문은 내보내지 않음)
+//	POST /api/migrate                        이관 시작 (소스가 Running 일 때만, 기본 --to verify — 정리 앞에서 멈춤) → run-id
 //	GET  /api/runs                           run 목록 (?dry=1 이면 dry-run 포함)
 //	GET  /api/runs/{case}/{run}              상세 (단계 · 판정 · 추천 · 비교)
 //	GET  /api/runs/{case}/{run}/log          로그 (?offset=)
@@ -171,7 +171,7 @@ func (s *Server) Handler() http.Handler {
 	}))
 	mux.HandleFunc("GET /api/regions", handle(func(r *http.Request) (any, error) { return s.listRegions() }))
 
-	// 「다음 단계」 — 사례 파일을 쓰고 dry-run 으로 추천까지 (자원은 만들지 않는다)
+	// 「사양 추천 받기」 — 사례 파일을 쓰고 dry-run 으로 추천까지 (자원은 만들지 않는다)
 	mux.HandleFunc("POST /api/preview", handle(func(r *http.Request) (any, error) {
 		if !s.previewMu.TryLock() {
 			return nil, fail(http.StatusTooManyRequests, "다른 사전 확인이 도는 중입니다 — 끝난 뒤 다시")
@@ -202,7 +202,14 @@ func (s *Server) Handler() http.Handler {
 		if !ok {
 			return nil, fail(http.StatusNotFound, "사례 파일이 없습니다")
 		}
-		return map[string]any{"caseName": r.PathValue("case"), "plan": plan}, nil
+		// 소스 상태는 확인 화면이 Migrate 버튼을 막는 데 쓴다 — 읽지 못하면 이유를 같이 준다
+		out := map[string]any{"caseName": r.PathValue("case"), "plan": plan}
+		if st, err := s.sourceStatus(plan.NS, plan.SourceInfra); err != nil {
+			out["sourceStatusErr"] = err.Error()
+		} else {
+			out["sourceStatus"] = st
+		}
+		return out, nil
 	}))
 	// 이관 시작 — stopBeforeCleanup(기본 true)이면 판정까지만 돌고 정리 앞에서 멈춘다
 	mux.HandleFunc("POST /api/migrate", handle(func(r *http.Request) (any, error) {
@@ -213,12 +220,20 @@ func (s *Server) Handler() http.Handler {
 		if err := decode(r, &in); err != nil {
 			return nil, err
 		}
-		rel, _, ok, err := readCase(s.Root, in.CaseName)
+		rel, plan, ok, err := readCase(s.Root, in.CaseName)
 		if err != nil {
 			return nil, err
 		}
 		if !ok {
 			return nil, errors.New("사례 파일이 없습니다 — 「새 이관」부터")
+		}
+		// 소스가 Running 이 아니면 패키지 단계의 원격 명령이 닿지 않는다 — 타겟을 만들기 전에 막는다
+		st, err := s.sourceStatus(plan.NS, plan.SourceInfra)
+		if err != nil {
+			return nil, fail(http.StatusBadGateway, "소스 %s 의 상태를 확인하지 못했습니다: %v", plan.SourceInfra, err)
+		}
+		if st != "Running" {
+			return nil, fail(http.StatusConflict, "소스 %s 가 %s 입니다 — MapUI 에서 Resume 해 Running 이 된 뒤 Migrate 합니다", plan.SourceInfra, st)
 		}
 		ev, err := s.evidence()
 		if err != nil {

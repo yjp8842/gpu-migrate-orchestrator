@@ -197,6 +197,31 @@ func (s *Server) listRegions() (any, error) {
 	})
 }
 
+// infraStatus 는 Tumblebug 상태 문자열의 앞부분이다 ('Suspended:1 (S:1/1)' → Suspended). 인프라가 없으면 NotFound.
+func infraStatus(infra M) string {
+	if infra == nil {
+		return "NotFound"
+	}
+	st, _, _ := strings.Cut(jsonx.S(infra, "status"), ":")
+	return or(st, "Unknown")
+}
+
+// sourceStatus 는 소스 인프라의 지금 상태다 — Migrate 직전 확인용이라 캐시하지 않는다.
+func (s *Server) sourceStatus(ns, id string) (string, error) {
+	if !nsRe.MatchString(ns) || !idRe.MatchString(id) {
+		return "", fmt.Errorf("소스 이름이 이상합니다")
+	}
+	tb, err := s.tumblebug()
+	if err != nil {
+		return "", err
+	}
+	infra, err := tb.GetInfra(ns, id)
+	if err != nil {
+		return "", err
+	}
+	return infraStatus(infra), nil
+}
+
 // deleteTarget 은 Beetle 로 만든 타겟을 지운다 — vNet · 보안 그룹 · SSH 키까지 (option=terminate).
 func (s *Server) deleteTarget(ns, id string) (any, error) {
 	st, err := s.settings()

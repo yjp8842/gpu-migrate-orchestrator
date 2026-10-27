@@ -29,7 +29,7 @@ export default function Runs() {
     <>
       <div className="head">
         <div>
-          <h1>이관</h1>
+          <h1>전체 이관 목록</h1>
           <p>소스 VM을 다른 클라우드로 옮기고 같은 서비스가 뜨는지 판정합니다.</p>
         </div>
         <Link className="btn pri" to="/new">+ 새 이관</Link>
