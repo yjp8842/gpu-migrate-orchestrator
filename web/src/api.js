@@ -31,6 +31,7 @@ export const api = {
   run: (c, r) => req('GET', `/api/runs/${c}/${r}`),
   log: (c, r, offset) => req('GET', `/api/runs/${c}/${r}/log?offset=${offset || 0}`),
   files: (c, r) => req('GET', `/api/runs/${c}/${r}/files`),
+  targetLive: (c, r) => req('GET', `/api/runs/${c}/${r}/target`),
   fileText: async (c, r, p) => {
     const res = await fetch(`/api/runs/${c}/${r}/file?path=${encodeURIComponent(p)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

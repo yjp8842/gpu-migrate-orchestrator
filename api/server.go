@@ -14,6 +14,7 @@
 //	GET  /api/runs                           run 목록 (?dry=1 이면 dry-run 포함)
 //	GET  /api/runs/{case}/{run}              상세 (단계 · 판정 · 추천 · 비교)
 //	GET  /api/runs/{case}/{run}/log          로그 (?offset=)
+//	GET  /api/runs/{case}/{run}/target       타겟의 지금 상태 · 공인 IP (Tumblebug, 「타겟 화면 열기」용)
 //	GET  /api/runs/{case}/{run}/files        증적 파일 목록,  /file?path=…  파일 하나,  /zip  증적 ZIP
 //	POST /api/runs/{case}/{run}/note         사람 개입 기록
 //	POST /api/runs/{case}/{run}/stop         실행 중지
@@ -396,6 +397,26 @@ func (s *Server) Handler() http.Handler {
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil
+	}))
+	// 타겟의 지금 상태 · 공인 IP — 아직 만들지 않았으면 status 가 null
+	mux.HandleFunc("GET /api/runs/{case}/{run}/target", handle(func(r *http.Request) (any, error) {
+		d, err := s.detail(r)
+		if err != nil {
+			return nil, err
+		}
+		infra, _ := d["target"].(M)["infra"].(string)
+		if infra == "" {
+			return M{"status": nil, "publicIP": nil}, nil
+		}
+		ns, err := s.targetNS(d)
+		if err != nil {
+			return nil, err
+		}
+		live, err := s.targetLive(ns, infra)
+		if err != nil {
+			return nil, fail(http.StatusBadGateway, "타겟 %s 의 지금 상태를 확인하지 못했습니다: %v", infra, err)
+		}
+		return live, nil
 	}))
 	mux.HandleFunc("POST /api/runs/{case}/{run}/delete-target", handle(func(r *http.Request) (any, error) {
 		d, err := s.detail(r)

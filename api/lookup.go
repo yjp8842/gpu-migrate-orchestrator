@@ -222,6 +222,38 @@ func (s *Server) sourceStatus(ns, id string) (string, error) {
 	return infraStatus(infra), nil
 }
 
+// infraLive 는 인프라의 지금 상태와 첫 노드의 공인 IP 다 (IP 꼴이 아니면 nil).
+func infraLive(infra M) M {
+	ip := ""
+	if l := jsonx.ListM(infra["node"]); len(l) > 0 {
+		ip = jsonx.S(l[0], "publicIP")
+	}
+	return M{"status": infraStatus(infra), "publicIP": publicIP(ip)}
+}
+
+// targetLive 는 타겟의 지금 상태 · 공인 IP 다. suspend 뒤 다시 켜면 공인 IP 가 바뀌므로, run 화면의 「타겟 화면 열기」는
+// run 폴더에 적힌 IP 대신 이 값을 쓴다. 인프라 GET 호출 제한 때문에 10초 캐시.
+func (s *Server) targetLive(ns, id string) (M, error) {
+	if !nsRe.MatchString(ns) || !idRe.MatchString(id) {
+		return nil, fmt.Errorf("타겟 이름이 이상합니다")
+	}
+	v, err := s.cache.get("target:"+ns+"/"+id, 10*time.Second, func() (any, error) {
+		tb, err := s.tumblebug()
+		if err != nil {
+			return nil, err
+		}
+		infra, err := tb.GetInfra(ns, id)
+		if err != nil {
+			return nil, err
+		}
+		return infraLive(infra), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(M), nil
+}
+
 // deleteTarget 은 Beetle 로 만든 타겟을 지운다 — vNet · 보안 그룹 · SSH 키까지 (option=terminate).
 func (s *Server) deleteTarget(ns, id string) (any, error) {
 	st, err := s.settings()

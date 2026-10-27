@@ -26,6 +26,8 @@ export default function RunPage() {
   const [noteText, setNoteText] = useState('');
   const [confirmName, setConfirmName] = useState('');
   const [busy, setBusy] = useState('');
+  // 타겟의 지금 상태 · 공인 IP (Tumblebug) — suspend 뒤 다시 켜면 IP 가 바뀌어, 기록된 IP 대신 이 값으로 화면을 연다
+  const [live, setLive] = useState(null);
 
   const running = d && d.status.key === 'running';
 
@@ -59,6 +61,15 @@ export default function RunPage() {
     if (d && !running) api.files(caseName, runId).then(setFiles).catch(() => {});
   }, [d && d.status.key, d && d.stages.map((s) => s.status).join()]);
 
+  const hasTarget = !!(d && d.target.infra);
+  function loadLive() {
+    setLive({ checking: true });
+    api.targetLive(caseName, runId).then(setLive).catch((e) => setLive({ err: e.message }));
+  }
+  useEffect(() => {
+    if (d && !running && hasTarget) loadLive();
+  }, [d && d.status.key, d && d.target.infra, d && d.stages.map((s) => s.status).join()]);
+
   async function act(name, fn) {
     setErr('');
     setBusy(name);
@@ -91,7 +102,15 @@ export default function RunPage() {
   const t1 = (c.tests || []).filter((t) => t.test.startsWith('T1'));
   const t2 = (c.tests || []).find((t) => t.test === 'T2');
   const goldenOk = (c.golden || []).filter((g) => g.result === 'PASS').length;
-  const waitingCleanup = !running && verify && verify.status === 'done' && cleanup && cleanup.status === 'pending';
+  // 타겟이 지금 Terminated · 없음이면 도구 밖(MapUI · Tumblebug 직접)에서 지운 것 — run 기록의 「정리 대기」보다 이쪽을 따른다
+  const goneStatus = live && !live.checking && !live.err && /^(Terminat|NotFound)/.test(live.status || '') ? live.status : '';
+  const waitingCleanup = !running && !goneStatus && verify && verify.status === 'done' && cleanup && cleanup.status === 'pending';
+  const leftover = goneStatus && goneStatus !== 'NotFound'; // Terminated 는 인프라 기록 · vNet · 보안 그룹 · 키가 남는다
+  const webPort = /lexai/.test(d.workload || '') && /shell|native/.test(d.workload || '') ? ':3000' : '';
+  // 열 IP: 지금 Running 이면 Tumblebug 의 IP, 상태를 못 읽었으면 기록된 IP, 타겟 이름이 없는 run 은 기록된 IP
+  const liveChecked = live && !live.checking && !live.err;
+  const openIP = !hasTarget || (live && live.err) ? d.target.publicIP : liveChecked && live.status === 'Running' ? live.publicIP : null;
+  const ipChanged = liveChecked && live.publicIP && d.target.publicIP && live.publicIP !== d.target.publicIP;
 
   return (
     <>
@@ -102,6 +121,7 @@ export default function RunPage() {
             <span className="mono" style={{ fontSize: 18 }}>{runId}</span>
             <StatusPill status={d.status} />
             {waitingCleanup && <span className="pill p-wait">정리 전 — 타겟 확인 대기</span>}
+            {goneStatus && cleanup && cleanup.status !== 'done' && <span className="pill p-stopped">타겟이 도구 밖에서 {goneStatus === 'NotFound' ? '삭제됨' : '종료됨'}</span>}
           </h1>
           <p>
             {src && <><Csp name={src} /> → <Csp name={dst} /> · </>}
@@ -109,11 +129,17 @@ export default function RunPage() {
           </p>
         </div>
         <div className="btns">
-          {d.target.publicIP && !running && <a className="btn" href={`http://${d.target.publicIP}${/lexai/.test(d.workload || '') && /shell|native/.test(d.workload || '') ? ':3000' : ''}/`} target="_blank" rel="noreferrer">타겟 화면 열기</a>}
+          {!running && openIP && <a className="btn" href={`http://${openIP}${webPort}/`} target="_blank" rel="noreferrer">타겟 화면 열기</a>}
+          {!running && !openIP && hasTarget && (
+            <button className="btn" type="button" disabled title={live && live.checking ? '타겟 상태 확인 중' : '타겟이 Running 일 때만 열 수 있습니다'}>타겟 화면 열기</button>
+          )}
           <button className="btn" type="button" onClick={() => setModal('note')}>사람 개입 기록</button>
           {running && <button className="btn danger" type="button" disabled={!!busy} onClick={() => act('stop', () => api.stop(caseName, runId))}>중지</button>}
           {waitingCleanup && <button className="btn" type="button" disabled={!!busy} onClick={() => act('cleanup', () => api.cleanup(caseName, runId))}>정리 단계 실행</button>}
-          {!running && d.target.infra && <button className="btn danger" type="button" onClick={() => { setConfirmName(''); setModal('delete'); }}>타겟 삭제</button>}
+          {!running && d.target.infra && goneStatus !== 'NotFound' && (
+            <button className="btn danger" type="button" onClick={() => { setConfirmName(''); setModal('delete'); }}
+              title={leftover ? 'VM 은 이미 종료됨 — 남은 인프라 기록 · vNet · 보안 그룹 · SSH 키를 지운다' : undefined}>{leftover ? '남은 자원 삭제' : '타겟 삭제'}</button>
+          )}
         </div>
       </div>
       {err && <div className="err">{err}</div>}
@@ -174,8 +200,18 @@ export default function RunPage() {
               <dt>인프라</dt><dd className="mono">{d.target.infra || '—'}</dd>
               <dt>존</dt><dd>{d.target.zone || '—'}{d.target.zones.length > 1 && d.target.zone ? ` (${d.target.zones.indexOf(d.target.zone) + 1}/${d.target.zones.length})` : ''}</dd>
               <dt>사양</dt><dd>{d.recommend.spec ? `${d.recommend.spec.name || d.recommend.spec.id}${d.recommend.spec.gpu ? ' · ' + d.recommend.spec.gpu : ''}` : '—'}</dd>
-              <dt>공인 IP</dt><dd className="mono">{d.target.publicIP || '—'}</dd>
+              {hasTarget && !running && (
+                <><dt>지금 상태</dt><dd style={{ color: liveChecked ? (live.status === 'Running' ? 'var(--ok)' : 'var(--bad)') : 'var(--mut)', fontWeight: 600 }}>
+                  {!live || live.checking ? '확인 중…' : live.err ? '확인 못 함' : live.status}</dd></>
+              )}
+              <dt>공인 IP</dt><dd className="mono">{(liveChecked && live.publicIP) || d.target.publicIP || '—'}{liveChecked && !live.publicIP && d.target.publicIP ? <span className="muted"> (기록된 값)</span> : null}</dd>
             </dl>
+            {ipChanged && <span className="muted">공인 IP 가 바뀌었습니다 (기록 {d.target.publicIP}) — 지금 IP 로 엽니다.</span>}
+            {liveChecked && live.status !== 'Running' && (
+              <span className="muted">타겟이 {live.status} 상태라 화면을 열 수 없습니다.{/^Suspend/.test(live.status) ? ' MapUI 에서 Resume 하면 공인 IP 가 바뀔 수 있으니, 켠 뒤 「다시 확인」을 누릅니다.' : ''}</span>
+            )}
+            {live && live.err && <span className="muted">타겟 상태를 확인하지 못해 기록된 IP 로 엽니다 — {live.err}</span>}
+            {hasTarget && !running && <div><button className="btn sm" type="button" disabled={live && live.checking} onClick={loadLive}>다시 확인</button></div>}
             {d.target.tries.length > 0 && <span className="muted">자원 없어 넘긴 존: {d.target.tries.map((t) => t.zone).join(', ')}</span>}
           </section>
           <section className="card">
@@ -244,7 +280,8 @@ export default function RunPage() {
       {modal === 'delete' && (
         <div className="modal" role="dialog" aria-modal="true" aria-label="타겟 삭제">
           <div className="card">
-            <h2>타겟 삭제</h2>
+            <h2>{leftover ? '남은 자원 삭제' : '타겟 삭제'}</h2>
+            {leftover && <span className="muted">VM 은 이미 {goneStatus} 입니다 — 남은 인프라 기록과 아래 자원을 지웁니다.</span>}
             <span>Beetle 삭제 API로 <b className="mono">{d.target.infra}</b> 와 Beetle이 만든 vNet · 보안 그룹 · SSH 키를 지웁니다. 되돌릴 수 없습니다. 증적은 남습니다.</span>
             <label className="f">확인용으로 인프라 이름을 그대로 입력<input type="text" value={confirmName} onChange={(e) => setConfirmName(e.target.value)} /></label>
             <div className="btns" style={{ justifyContent: 'flex-end' }}>

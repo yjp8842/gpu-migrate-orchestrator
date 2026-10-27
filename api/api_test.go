@@ -76,6 +76,19 @@ func TestInfraStatus(t *testing.T) {
 	}
 }
 
+func TestInfraLive(t *testing.T) {
+	got := infraLive(M{"status": "Running:1 (R:1/1)", "node": []any{M{"publicIP": "198.51.100.67"}}})
+	if got["status"] != "Running" || got["publicIP"] != "198.51.100.67" {
+		t.Fatalf("Running: %+v", got)
+	}
+	if got := infraLive(M{"status": "Suspended:1 (S:1/1)", "node": []any{M{"publicIP": ""}}}); got["status"] != "Suspended" || got["publicIP"] != nil {
+		t.Fatalf("Suspended: %+v", got)
+	}
+	if got := infraLive(nil); got["status"] != "NotFound" || got["publicIP"] != nil {
+		t.Fatalf("없는 인프라: %+v", got)
+	}
+}
+
 func TestBuildCaseOpenPorts(t *testing.T) {
 	in := baseInput()
 	rules := []portInput{{Port: 80, CIDR: MyIPCIDR}, {Port: 8080, CIDR: " 10.20.0.0/16 "}}
