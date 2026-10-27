@@ -40,6 +40,26 @@ func TestDryRunRecommendAllowedWritesBlocked(t *testing.T) {
 	}
 }
 
+// 생성 가능 사전 검사는 자원을 만들지 않으므로 dry-run 에서도 부른다 — 경로 · useExisting · 결과 풀기
+func TestValidateInfraDryRun(t *testing.T) {
+	var path, use string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path, use = r.URL.Path, r.URL.Query().Get("useExisting")
+		w.Write([]byte(`{"success":true,"data":{"valid":false,"issues":[{"code":"SPEC_IMAGE_INCOMPATIBLE","severity":"error"}]}}`))
+	}))
+	defer srv.Close()
+	b := New(config.Endpoint{URL: srv.URL + "/beetle"}, logx.Quiet(), true)
+	b.Sleep = func(time.Duration) {}
+	b.MinInterval = 0
+	v, err := b.ValidateInfra("default", jsonx.M{}, false)
+	if err != nil || v["valid"] != false || len(jsonx.ListM(v["issues"])) != 1 {
+		t.Fatal(v, err)
+	}
+	if path != "/beetle/validation/ns/default/infra" || use != "false" {
+		t.Fatal(path, use)
+	}
+}
+
 func TestUnwrapError(t *testing.T) {
 	if _, err := Unwrap(jsonx.M{"success": false, "message": "bad"}); err == nil {
 		t.Fatal("실패 응답을 통과시켰다")

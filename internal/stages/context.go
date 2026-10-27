@@ -56,6 +56,7 @@ type Tumblebug interface {
 type Beetle interface {
 	RecommendInfra(req M, limit int) ([]any, error)
 	MigrateInfra(ns string, body M, nameSeed string, useExisting bool, timeout time.Duration) (M, error)
+	ValidateInfra(ns string, body M, useExisting bool) (M, error)
 	ListInfraIDs(ns string) ([]string, error)
 	DeleteInfra(ns, id string) (any, error)
 	EncryptionKey() (M, error)

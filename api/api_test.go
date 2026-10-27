@@ -390,3 +390,22 @@ func TestNamespace(t *testing.T) {
 		t.Fatal("이상한 네임스페이스로 조회함")
 	}
 }
+
+// 생성 가능 사전 검사 요약 — 이름 충돌은 막지 않고, 그 밖의 error 는 막는다 (엔진 precheckCreate 와 같은 규칙)
+func TestValidationSummary(t *testing.T) {
+	dir := t.TempDir()
+	if validationSummary(dir) != nil {
+		t.Fatal("검사 파일이 없으면 nil")
+	}
+	os.MkdirAll(filepath.Join(dir, "recommend"), 0o755)
+	write := func(body string) M {
+		os.WriteFile(filepath.Join(dir, "recommend", "validation.json"), []byte(body), 0o644)
+		return validationSummary(dir).(M)
+	}
+	if v := write(`{"valid":false,"issues":[{"code":"RESOURCE_ALREADY_EXISTS","severity":"error","message":"vnet-01"}]}`); v["valid"] != true {
+		t.Fatal(v)
+	}
+	if v := write(`{"valid":false,"issues":[{"code":"SPEC_IMAGE_INCOMPATIBLE","severity":"error","message":"x"}]}`); v["valid"] != false || !v["issues"].([]M)[0]["blocking"].(bool) {
+		t.Fatal(v)
+	}
+}

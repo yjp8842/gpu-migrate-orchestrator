@@ -356,7 +356,25 @@ func recommendSummary(dir string) M {
 		}
 	}
 	out["candidates"] = cands
+	out["validation"] = validationSummary(dir)
 	return out
+}
+
+// validationSummary 는 생성 가능 사전 검사 결과 — recommend/validation.json (Beetle 검증 API 응답). 검사 전 판이면 nil.
+// 막는 것은 severity=error 중 이름 충돌(RESOURCE_ALREADY_EXISTS)을 뺀 것 — 엔진(precheckCreate)과 같은 규칙이다.
+func validationSummary(dir string) any {
+	v, err := jsonx.ReadFile(filepath.Join(dir, "recommend", "validation.json"))
+	if err != nil {
+		return nil
+	}
+	issues, valid := []M{}, true
+	for _, is := range jsonx.ListM(jsonx.AsM(v)["issues"]) {
+		block := jsonx.S(is, "severity") == "error" && jsonx.S(is, "code") != "RESOURCE_ALREADY_EXISTS"
+		valid = valid && !block
+		issues = append(issues, M{"code": jsonx.S(is, "code"), "severity": jsonx.S(is, "severity"), "path": jsonx.S(is, "path"),
+			"message": jsonx.S(is, "message"), "blocking": block})
+	}
+	return M{"valid": valid, "issues": issues}
 }
 
 // compareSummary 는 이관 동등성 결과 — verify/evidence 의 summary.txt(테스트별 줄)와 rows.tsv(골든 문항).
