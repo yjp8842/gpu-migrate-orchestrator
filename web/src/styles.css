@@ -98,9 +98,19 @@ pre.code { margin: 0; background: #0F172A; color: #E5E7EB; border-radius: 8px; p
 .line > span.muted:first-child, .line > span.muted:last-child { flex: none; white-space: nowrap; }
 .tbar { display: flex; align-items: center; gap: 10px; font-size: 12.5px; } .tbar i { flex: 1 1 auto; height: 8px; background: var(--line2); border-radius: 4px; overflow: hidden; } .tbar i b { display: block; height: 8px; background: var(--acc); }
 .tbar .k { width: 68px; flex: none; } .tbar .v { width: 70px; flex: none; text-align: right; color: var(--mut); }
-.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); }
-.files a, .files div { padding: 9px 18px; border-top: 1px solid var(--line2); display: flex; justify-content: space-between; gap: 8px; min-width: 0; text-decoration: none; color: var(--fg); }
-.files .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .files small { color: var(--mut); flex: none; }
+.evg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); border-top: 1px solid var(--line2); }
+.evg { padding: 12px 18px 14px; min-width: 0; }
+.evg-grid .evg { border-bottom: 1px solid var(--line2); }
+.evg h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+.evg h3 small { font-weight: 400; margin-left: 6px; }
+.ef { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; padding: 6px 0; border-top: 1px solid var(--line2); text-decoration: none; color: var(--fg); }
+.ef:hover .mono { color: var(--acc); }
+.ef .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.ef small { color: var(--mut); }
+.ef em { grid-column: 1 / -1; font-style: normal; font-size: 12px; color: var(--mut); }
+.evd { border-top: 1px solid var(--line2); }
+.evd summary { padding: 11px 18px; cursor: pointer; font-weight: 600; }
+.evr { padding: 11px 18px; border-top: 1px solid var(--line2); font-size: 12.5px; }
 .modal { position: fixed; inset: 0; background: rgba(15, 23, 42, .4); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
 .modal .card { width: min(560px, 100%); }
 .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }

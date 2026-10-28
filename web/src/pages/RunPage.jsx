@@ -2,8 +2,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, fmtBytes, fmtSec, fmtTime, STAGE_LABEL } from '../api.js';
 import { Csp, StatusPill, routeOf } from '../Layout.jsx';
+import { classifyFiles } from '../evidence.js';
 
 const STATE_LABEL = { done: '✓ 완료', running: '● 진행 중', failed: '✕ 실패', pending: '대기' };
+
+// EvidenceFile 은 증적 파일 한 줄 — 경로 · 크기, 있으면 그 아래 한 줄 설명
+function EvidenceFile({ f, href }) {
+  return (
+    <a className="ef" href={href} target="_blank" rel="noreferrer">
+      <span className="mono" title={f.path}>{f.path}</span><small>{fmtBytes(f.size)}</small>
+      {f.desc && <em>{f.desc}</em>}
+    </a>
+  );
+}
 
 function logClass(line) {
   if (/ERROR|실패/.test(line)) return 'e';
@@ -111,6 +122,10 @@ export default function RunPage() {
   const liveChecked = live && !live.checking && !live.err;
   const openIP = !hasTarget || (live && live.err) ? d.target.publicIP : liveChecked && live.status === 'Running' ? live.publicIP : null;
   const ipChanged = liveChecked && live.publicIP && d.target.publicIP && live.publicIP !== d.target.publicIP;
+  const fileHref = (path) => `/api/runs/${caseName}/${runId}/file?path=${encodeURIComponent(path)}`;
+  const evidence = files && classifyFiles(files.files);
+  if (evidence) evidence.coreCount = evidence.core.reduce((n, g) => n + g.files.length, 0);
+  const judged = d.verdict && d.verdict.result !== 'DRY-RUN'; // 판정까지 갔는데 골든 비교(T2)가 없으면 워크로드가 응답을 대조하지 않는 것
 
   return (
     <>
@@ -166,11 +181,12 @@ export default function RunPage() {
               {(c.warns || []).length > 0 && <span className="muted">WARN — {(c.warns || []).slice(0, 4).join(' / ')}</span>}
             </section>
             <section className="card">
-              <h2>테스트2 — 골든 응답 완전 일치 {t2 && <span className={`pill ${t2.result === 'PASS' ? 'p-pass' : 'p-fail'}`}>{goldenOk} / {(c.golden || []).length}</span>}</h2>
+              <h2>테스트2 — 질문 응답 동일성 {t2 && <span className={`pill ${t2.result === 'PASS' ? 'p-pass' : 'p-fail'}`}>{t2.result === 'PASS' ? 'PASS' : 'FAIL'} · 일치 {goldenOk} / {(c.golden || []).length}</span>}</h2>
               {(c.golden || []).map((g) => (
                 <div className="line" key={g.q}>
                   <span><b className="mono">{g.q}</b> <span className="muted">{g.note}</span></span>
-                  <b style={{ color: g.result === 'PASS' ? 'var(--ok)' : 'var(--bad)', flex: 'none' }}>{g.result === 'PASS' ? '일치' : '다름'}</b>
+                  {/* WARN — 추천 상품은 같고 환경(GPU · 드라이버 등)이 달라 문장만 다름. 판정은 통과 */}
+                  <b style={{ color: g.result === 'PASS' ? 'var(--ok)' : g.result === 'WARN' ? 'var(--warn)' : 'var(--bad)', flex: 'none' }}>{g.result === 'PASS' ? '일치' : g.result === 'WARN' ? '문장만 다름' : '다름'}</b>
                 </div>
               ))}
               {!t2 && <span className="muted">골든 비교가 없는 워크로드입니다 — {d.verdict.summary}</span>}
@@ -237,23 +253,36 @@ export default function RunPage() {
         </div>
       </div>
 
-      {files && (
+      {evidence && (
         <section className="card flush">
           <div className="ch">
-            <b>증적 <span className="muted" style={{ fontWeight: 400 }}>자동 회수 · {fmtBytes(files.total)} · {files.files.length}개 파일</span></b>
+            <b>증적 <span className="muted" style={{ fontWeight: 400 }}>핵심 {evidence.coreCount}개 · 전체 {files.files.length}개 · {fmtBytes(files.total)}</span></b>
             <div className="btns">
-              <a className="btn" href={`/api/runs/${caseName}/${runId}/file?path=summary.md`} target="_blank" rel="noreferrer">요약 보고서 (summary.md)</a>
+              <a className="btn" href={fileHref('summary.md')} target="_blank" rel="noreferrer">요약 보고서 (summary.md)</a>
               <a className="btn pri" href={`/api/runs/${caseName}/${runId}/zip`}>증적 ZIP 받기</a>
             </div>
           </div>
-          <div className="files">
-            {files.files.slice(0, 60).map((f) => (
-              <a key={f.path} href={`/api/runs/${caseName}/${runId}/file?path=${encodeURIComponent(f.path)}`} target="_blank" rel="noreferrer">
-                <span className="mono" title={f.path}>{f.path}</span><small>{fmtBytes(f.size)}</small>
-              </a>
+          <div className="evg-grid">
+            {evidence.core.map((g) => (
+              <div className="evg" key={g.key}>
+                <h3>{g.title}</h3>
+                {g.files.map((f) => <EvidenceFile key={f.path} f={f} href={fileHref(f.path)} />)}
+                {g.files.length === 0 && <span className="muted">{g.empty && judged && !t2 ? g.empty : '이 run 에는 없습니다'}</span>}
+              </div>
             ))}
           </div>
-          {files.files.length > 60 && <div className="muted" style={{ padding: '10px 18px' }}>나머지 {files.files.length - 60}개는 ZIP에 들어 있습니다</div>}
+          {evidence.debug.length > 0 && (
+            <details className="evd">
+              <summary>문제가 생겼을 때 보는 파일 · {evidence.debug.reduce((n, g) => n + g.files.length, 0)}개</summary>
+              {evidence.debug.map((g) => (
+                <div className="evg" key={g.title}>
+                  <h3>{g.title} <small className="muted">{g.desc}</small></h3>
+                  {g.files.map((f) => <EvidenceFile key={f.path} f={f} href={fileHref(f.path)} />)}
+                </div>
+              ))}
+            </details>
+          )}
+          {evidence.rest.length > 0 && <div className="muted evr">중간 계산 · 중복 파일 {evidence.rest.length}개는 화면에 두지 않았습니다 — 증적 ZIP 에 들어 있습니다</div>}
         </section>
       )}
 

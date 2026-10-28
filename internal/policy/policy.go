@@ -98,7 +98,7 @@ func SelectCandidate(cands []any, sourceGPU M, mode string) (int, string) {
 		}
 		if best != nil {
 			g := best.g
-			return best.i, fmt.Sprintf("같은 GPU 모델(%s) 중 가장 싼 %s (VRAM %sGB, %s) — LLM 완전 일치의 전제", g.model, g.spec, num(g.vram), costStr(g))
+			return best.i, fmt.Sprintf("같은 GPU 모델(%s) 중 가장 싼 %s (VRAM %sGB, %s) — 응답 문장까지 비교하는 전제", g.model, g.spec, num(g.vram), costStr(g))
 		}
 	}
 	var best *scored
