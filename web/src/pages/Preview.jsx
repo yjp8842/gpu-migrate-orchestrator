@@ -123,7 +123,7 @@ export default function Preview() {
                   <dt>사양</dt><dd><b>{spec.name || spec.id}</b>{spec.vcpu ? ` · vCPU ${spec.vcpu} · ${spec.memoryGiB}GiB` : ''}</dd>
                   <dt>GPU</dt><dd>{spec.gpu ? `${spec.gpu} · ${spec.vram}GB` : '—'}</dd>
                   <dt>OS</dt><dd>{(rec.image && rec.image.os) || '—'}{rec.rootDisk ? ` · 디스크 ${rec.rootDisk}GB` : ''}</dd>
-                  <dt>예상 비용</dt><dd>{spec.cost ? `시간당 $${Number(spec.cost).toFixed(2)}` : '—'}</dd>
+                  <dt>예상 비용</dt><dd>{spec.cost > 0 ? `시간당 $${Number(spec.cost).toFixed(2)}` : spec.cost < 0 ? '가격 미등록 (Tumblebug 에 가격 정보 없음)' : '—'}</dd>
                 </dl>
               ) : <span className="muted">추천 결과가 없습니다</span>}
             </section>
