@@ -156,17 +156,32 @@ func FirewallFromSG(rules []M, openPorts []M) []Rule {
 	return table
 }
 
+// cpuOf 는 Beetle 정의대로 채운다 — cpus 는 소켓 수, cores · threads 는 소켓 하나의 코어 · 논리 CPU 수이고 Beetle 은 vCPU 를 cpus × threads 로 본다.
+// 클라우드 VM 은 소켓 1 · 논리 CPU = vCPU 로 둔다.
 func cpuOf(spec M) CPU {
 	vcpu := jsonx.Int(spec["vCPU"])
-	threads := 1
+	cores := vcpu
 	if vcpu >= 2 && vcpu%2 == 0 { // 클라우드 vCPU 는 보통 하이퍼스레드 2 — 메타에 코어 수가 없어 추정
-		threads = 2
+		cores = vcpu / 2
 	}
-	cores := vcpu / threads
 	if cores < 1 {
 		cores = 1
 	}
-	return CPU{Architecture: jsonx.SOr(spec, "architecture", "x86_64"), Cpus: vcpu, Cores: cores, Threads: threads}
+	return CPU{Architecture: jsonx.SOr(spec, "architecture", "x86_64"), Cpus: 1, Cores: cores, Threads: vcpu}
+}
+
+// VCPU 는 소스 모델의 cpu 객체에서 vCPU 를 읽는다 (Beetle 과 같이 cpus × threads).
+// 예전 run 의 모델은 cpus 에 vCPU 를 넣고 cores × threads = cpus 로 썼다 — 그 꼴이면 cpus 를 그대로 쓴다.
+func VCPU(cpu any) int {
+	c := jsonx.AsM(cpu)
+	cpus, cores, threads := jsonx.Int(c["cpus"]), jsonx.Int(c["cores"]), jsonx.Int(c["threads"])
+	if threads < 1 {
+		threads = 1
+	}
+	if cpus > 1 && cores*threads == cpus {
+		return cpus
+	}
+	return cpus * threads
 }
 
 func gpuCards(spec M, driverSeries string) []GPU {

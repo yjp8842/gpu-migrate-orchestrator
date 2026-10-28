@@ -18,6 +18,7 @@ import (
 
 	"gpu-migrate-orchestrator/internal/config"
 	"gpu-migrate-orchestrator/internal/jsonx"
+	"gpu-migrate-orchestrator/internal/sourcemodel"
 )
 
 // run 폴더 읽기 — 목록 · 상세(단계 · 판정 · 개입) · 로그 · 증적 파일 · 비교 결과. 엔진이 쓴 파일을 그대로 읽기만 한다.
@@ -281,7 +282,7 @@ func sourceSummary(dir string) any {
 	}
 	return M{
 		"infra": nilIfEmpty(jsonx.S(jsonx.AsM(meta["infra"]), "id")), "region": nilIfEmpty(jsonx.S(jsonx.AsM(mn["region"]), "region")), "spec": nilIfEmpty(spec),
-		"machine": n["machineId"], "vcpu": jsonx.Get(n, "cpu", "cpus"), "memoryGB": jsonx.Get(n, "memory", "totalSize"),
+		"machine": n["machineId"], "vcpu": sourcemodel.VCPU(n["cpu"]), "memoryGB": jsonx.Get(n, "memory", "totalSize"),
 		"disk": jsonx.Get(n, "rootDisk", "totalSize"), "os": jsonx.Get(n, "os", "prettyName"), "gpu": gpu, "firewall": fw,
 	}
 }

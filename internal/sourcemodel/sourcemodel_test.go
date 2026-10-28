@@ -56,13 +56,37 @@ func build(t *testing.T) OnpremInfra {
 		Rules: jsonx.ListM(jsonx.Get(m, "sg", "firewallRules"))}}, []string{jsonx.S(jsonx.AsM(m["vnet"]), "cidrBlock")}, "595", nil)
 }
 
+func TestVCPU(t *testing.T) {
+	for _, c := range []struct {
+		cpu  M
+		want int
+	}{
+		{M{"cpus": 1, "cores": 2, "threads": 4}, 4},    // 지금 모델
+		{M{"cpus": 4, "cores": 2, "threads": 2}, 4},    // 예전 run 의 모델 (cpus 에 vCPU)
+		{M{"cpus": 8, "cores": 8, "threads": 1}, 8},    // 예전 run · 스레드 1
+		{M{"cpus": 2, "cores": 18, "threads": 36}, 72}, // 2 소켓 서버 (Beetle 예)
+		{M{"cpus": 1, "cores": 1, "threads": 1}, 1},
+	} {
+		if v := VCPU(c.cpu); v != c.want {
+			t.Fatal(c.cpu, v, c.want)
+		}
+	}
+	m := build(t)
+	b, _ := json.Marshal(m)
+	d, _ := jsonx.Decode(b)
+	if v := VCPU(jsonx.ListM(jsonx.Get(d, "nodes"))[0]["cpu"]); v != 4 {
+		t.Fatal("Beetle 이 읽을 vCPU 가 4 가 아니다", v)
+	}
+}
+
 func TestShapeMatchesBeetle(t *testing.T) {
 	m := build(t)
 	n := m.Nodes[0]
 	if m.Network.IPv4Networks.CidrBlocks[0] != "10.2.0.0/16" || n.MachineID != "i-0123456789abcdef0" {
 		t.Fatal(m)
 	}
-	if n.CPU != (CPU{"x86_64", 4, 2, 2}) || n.Memory.TotalSize != 16 || n.RootDisk != (Disk{"/", "gp3", 100}) {
+	// Beetle 은 vCPU 를 cpus × threads 로 본다 — 4 vCPU 는 소켓 1 · 코어 2 · 논리 CPU 4
+	if n.CPU != (CPU{"x86_64", 1, 2, 4}) || n.Memory.TotalSize != 16 || n.RootDisk != (Disk{"/", "gp3", 100}) {
 		t.Fatal(n)
 	}
 	if n.Interfaces[0].IPv4CidrBlocks[0] != "10.2.70.79/18" || n.OS.PrettyName != "Ubuntu 24.04" || n.OS.VersionID != "24.04" {

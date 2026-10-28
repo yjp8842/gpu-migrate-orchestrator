@@ -12,6 +12,7 @@ import (
 
 	"gpu-migrate-orchestrator/internal/jsonx"
 	"gpu-migrate-orchestrator/internal/policy"
+	"gpu-migrate-orchestrator/internal/sourcemodel"
 	"gpu-migrate-orchestrator/internal/tumblebug"
 )
 
@@ -102,7 +103,7 @@ func tumblebugPickSpec(ctx *Context, tb Tumblebug, srcGPU M, model any) (M, stri
 	if ns := jsonx.ListM(jsonx.Get(model, "nodes")); len(ns) > 0 {
 		node = ns[0]
 	}
-	vcpu := jsonx.Int(jsonx.Get(node, "cpu", "cpus"))
+	vcpu := sourcemodel.VCPU(node["cpu"])
 	if vcpu == 0 {
 		vcpu = 4
 	}
