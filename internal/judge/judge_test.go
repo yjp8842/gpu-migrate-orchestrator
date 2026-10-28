@@ -63,3 +63,22 @@ func TestEvaluateColumns(t *testing.T) {
 		t.Fatal("오류 열이 없는 결과표를 PASS 로 보지 않았다", v)
 	}
 }
+
+// LexAI(migcompare.py)가 남기는 결과표 · 비교표 표본으로 판정한다 — 같은 시각의 비교 행이 묶이고, WARN 은 판정을 바꾸지 않는다.
+func TestLexAIFormat(t *testing.T) {
+	v := Evaluate(fix(t, "lexai/results.csv"), 0, fix(t, "lexai/migration-compare.csv"), true)
+	if v["result"] != "PASS" || v["timestamp"] != "2026-10-28 17:05:12" {
+		t.Fatal(v)
+	}
+	by := jsonx.AsM(jsonx.Get(v, "compare", "by_result"))
+	if by["FAIL"] != nil || by["WARN"] != 1 || by["PASS"] == nil {
+		t.Fatal(by)
+	}
+	if w := jsonx.Strings(v["warn"]); len(w) != 1 || !strings.HasPrefix(w[0], "T2 q02:") {
+		t.Fatal(w)
+	}
+	bad := fix(t, "lexai/migration-compare.csv") + "2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T1-3,db:fingerprint,원본 지문,불일치,FAIL,-\n"
+	if v := Evaluate(fix(t, "lexai/results.csv"), 0, bad, true); v["result"] != "FAIL" {
+		t.Fatal("LexAI 비교 FAIL 이 판정을 FAIL 로 바꾸지 않았다", v)
+	}
+}

@@ -27,7 +27,13 @@ transfer:
   method: beetle
   strategy: direct
 run:
-  env: {}
+  env:
+    LLM_TEMPERATURE: "0"   # 백업 전에 소스 AI 서버를 이 값으로 다시 띄운다 (어댑터 restart) — 답변 문장 비교의 전제
+    LLM_SEED: "42"
+    COMPARE: "1"           # 이번 회차의 비교 행(migration-compare.csv)이 없으면 FAIL
+    RUN_VERIFY: "1"        # 이관 때도 verify.sh 를 돌려 결과표(results.csv)를 남긴다
+  golden: true
+  rebuild_before_backup: true
   timeout_start_min: 75
   on_existing: stop
 cleanup: keep

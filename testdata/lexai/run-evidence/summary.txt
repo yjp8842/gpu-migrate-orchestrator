@@ -1,0 +1,11 @@
+이관 동등성: WARN
+일시 2026-10-28 17:05:12 · 타겟 gcp-compose · 소스 compose · 패키지 20261028-080608
+
+test   판정      PASS  FAIL  WARN  SKIP  INFO  항목
+T1-1   PASS       2     0     0     0     0  서비스 수 · 이름
+T1-2   PASS       2     0     0     0     0  패키지 파일 (이름 · 바이트 · 해시)
+T1-3   PASS       2     0     0     0     0  데이터 (DB 지문 · 색인 문서 수)
+T2     WARN      10     0     1     0     1  LLM 응답 (검색 결과 · 답변)
+
+FAIL · WARN 1건
+  WARN [T2] q02 — a:94cbf8f7ce4c d:7,11 → a:e0c917548945 d:7,11 (검색 같음 · 문장만 다름 — 환경 차이 (유사도 0.86))

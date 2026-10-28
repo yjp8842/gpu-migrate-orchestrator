@@ -1,0 +1,19 @@
+timestamp,form,source_form,package,test,item,source,target,result,note
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T1-1,services:count,5,5,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T1-1,services:names,ai frontend ollama opensearch tomcat,ai frontend ollama opensearch tomcat,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T1-2,files:count,4,4,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T1-2,files:bytes,5394,5394,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T1-3,db:fingerprint,원본 지문,일치,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T1-3,index:docs,253207,253207,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,pre:temperature,0.0,0.0,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,pre:seed,42,42,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,env:gpu,NVIDIA L4,NVIDIA L4,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,env:driver,580.95.05,580.95.05,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,env:ollama_version,0.12.3,0.13.0,INFO,환경 차이 — 문장이 달라도 WARN 으로 봄
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,env:model_id,abc123def456,abc123def456,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,golden:status,ok,-,PASS,-
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,q01,"a:363d9b0877d0 d:7,11","a:363d9b0877d0 d:7,11",PASS,검색 결과 · 답변 완전 일치
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,q02,"a:94cbf8f7ce4c d:7,11","a:e0c917548945 d:7,11",WARN,검색 같음 · 문장만 다름 — 환경 차이 (유사도 0.86)
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,q03,"a:5e6d6a7f983f d:7,11","a:5e6d6a7f983f d:7,11",PASS,검색 결과 · 답변 완전 일치
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,q04,"a:d04a3c4e2b08 d:7,11","a:d04a3c4e2b08 d:7,11",PASS,검색 결과 · 답변 완전 일치
+2026-10-28 17:05:12,gcp-compose,compose,20261028-080608,T2,q05,"a:9d65f491f3ce d:7,11","a:9d65f491f3ce d:7,11",PASS,검색 결과 · 답변 완전 일치

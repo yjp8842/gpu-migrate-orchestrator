@@ -1,10 +1,14 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gpu-migrate-orchestrator/internal/jsonx"
 )
 
 func root(t *testing.T) string {
@@ -279,6 +283,49 @@ func TestWidgetragShellPackageExpect(t *testing.T) {
 	for k, v := range want {
 		if got[k] != v {
 			t.Fatalf("package_expect %s = %q, want %q (전체 %v)", k, got[k], v, got)
+		}
+	}
+}
+
+// TestAdapterCommandsParse 는 어댑터의 명령이 bash 문법으로 읽히는지 본다 (실행은 하지 않는다).
+// entry · backup · restart · rebuild 는 템플릿이라 값을 채운 뒤 본다 — {이름} 을 값으로 바꾸므로 셸의 { … } 는 {{ … }} 로
+// 적어야 하고, 빠뜨리면 여기서 걸린다. source_restore · existing_check · diagnostics 는 그대로 보낸다.
+func TestAdapterCommandsParse(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash 없음")
+	}
+	files, _ := filepath.Glob(filepath.Join(root(t), "adapters", "*.yaml"))
+	vals := map[string]string{"env": "A=1 B=2", "source_env": "LLM_TEMPERATURE=0 LLM_SEED=42", "package_dir": "~/pkg",
+		"out_dir": "~/out/1", "golden": "1", "ts": "20261028-120000", "repo_raw": "https://example.invalid/r", "branch": "b"}
+	for _, f := range files {
+		name := strings.TrimSuffix(filepath.Base(f), ".yaml")
+		ad, err := LoadAdapter(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cmds, raw := map[string]string{}, map[string]bool{}
+		for _, k := range []string{"entry", "backup", "restart", "rebuild", "source_restore", "existing_check"} {
+			if s, ok := ad.Raw[k].(string); ok && s != "" {
+				cmds[k] = s
+				raw[k] = k == "source_restore" || k == "existing_check"
+			}
+		}
+		for i, d := range jsonx.ListM(ad.Raw["diagnostics"]) {
+			k := fmt.Sprintf("diagnostics[%d]", i)
+			cmds[k], raw[k] = jsonx.S(d, "command"), true
+		}
+		for k, tmpl := range cmds {
+			cmd := tmpl
+			if !raw[k] {
+				var err error
+				if cmd, err = Render(tmpl, vals); err != nil {
+					t.Errorf("%s %s: %v", name, k, err)
+					continue
+				}
+			}
+			if out, err := exec.Command("bash", "-n", "-c", cmd).CombinedOutput(); err != nil {
+				t.Errorf("%s %s 가 bash 문법이 아니다: %v %s\n%s", name, k, err, out, cmd)
+			}
 		}
 	}
 }

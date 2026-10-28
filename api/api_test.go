@@ -57,11 +57,12 @@ func TestBuildCase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lx.Policy.OpenPorts[0].Port != 3000 || lx.Target.Zone == nil || *lx.Target.Zone != "ap-northeast-2a" || lx.Run.Golden != nil {
+	if lx.Policy.OpenPorts[0].Port != 3000 || lx.Target.Zone == nil || *lx.Target.Zone != "ap-northeast-2a" || lx.Run.Golden == nil || !*lx.Run.Golden {
 		t.Fatalf("lexai-a: %+v %+v", lx.Policy, lx.Run)
 	}
-	if b, _ := caseYAML(lx); strings.Contains(string(b), "golden") {
-		t.Fatalf("lexai 에 golden 이 들어감:\n%s", b)
+	// LexAI 도 이관 비교를 한다 — 골든 · 백업 전 재기동 · 결과표(RUN_VERIFY) · 비교 행 요구(COMPARE)
+	if lx.Run.RebuildBeforeBackup == nil || !*lx.Run.RebuildBeforeBackup || lx.Run.Env["RUN_VERIFY"] != "1" || lx.Run.Env["COMPARE"] != "1" || lx.Run.Env["LLM_TEMPERATURE"] != "0" {
+		t.Fatalf("lexai-a run: %+v", lx.Run)
 	}
 }
 
@@ -213,6 +214,32 @@ func TestCompareSummary(t *testing.T) {
 		t.Fatalf("warns: %v", w)
 	}
 	if d := c["diffs"].([]string); len(d) != 1 || d[0] != "q04.diff" {
+		t.Fatalf("diffs: %v", d)
+	}
+}
+
+// LexAI(migcompare.py)가 남기는 증적 표본(testdata/lexai/run-evidence — evidence/ 는 .gitignore 대상)을 콘솔이 읽는다 — 테스트별 줄 · 골든 문항 · 차이 파일.
+func TestCompareSummaryLexAI(t *testing.T) {
+	dir := t.TempDir()
+	ev := filepath.Join(dir, "verify", "evidence")
+	os.MkdirAll(filepath.Join(ev, "golden-diff"), 0o755)
+	src := filepath.Join("..", "testdata", "lexai", "run-evidence")
+	for _, f := range []string{"summary.txt", "rows.tsv", filepath.Join("golden-diff", "q02.diff")} {
+		b, err := os.ReadFile(filepath.Join(src, f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		os.WriteFile(filepath.Join(ev, f), b, 0o644)
+	}
+	c := compareSummary(dir)
+	tests := c["tests"].([]M)
+	if c["headline"] != "이관 동등성: WARN" || len(tests) != 4 || tests[3]["test"] != "T2" || tests[3]["result"] != "WARN" || tests[3]["warn"] != 1 {
+		t.Fatalf("tests: %v", c)
+	}
+	if g := c["golden"].([]M); len(g) != 5 || g[1]["q"] != "q02" || g[1]["result"] != "WARN" {
+		t.Fatalf("golden: %v", g)
+	}
+	if d := c["diffs"].([]string); len(d) != 1 || d[0] != "q02.diff" {
 		t.Fatalf("diffs: %v", d)
 	}
 }

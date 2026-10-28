@@ -94,9 +94,16 @@ func runVerify(ctx *Context) (M, error) {
 	if jsonx.S(res, "csv") == "" { // 결과표가 없는 워크로드 — 상태 파일(results.status.require)만으로 판정
 		return verifyStatusOnly(ctx, jsonx.AsM(res["status"]))
 	}
-	resultsText, _, err := ctx.ReadText("target", jsonx.S(res, "csv"))
+	resultsText, found, err := ctx.ReadText("target", jsonx.S(res, "csv"))
 	if err != nil {
 		return nil, err
+	}
+	// 결과표를 켜야 생기는 워크로드(LexAI 는 이관 때 RUN_VERIFY=1)에서 결과표가 없으면, 예전처럼 상태 파일로만 판정한다 —
+	// 결과표가 생기기 전에 만든 사례를 다시 돌려도 NO-RESULT 로 떨어지지 않게. 그렇다고 판정 근거가 줄었다는 것은 남긴다.
+	if !found && res["status"] != nil {
+		note := fmt.Sprintf("결과표 %s 가 없어 상태 파일로만 판정했다 — 결과표 · 비교표까지 판정하려면 사례 run.env 에 RUN_VERIFY=1", jsonx.S(res, "csv"))
+		ctx.Log.Warn(stVerify, "%s", note)
+		return verifyStatusOnly(ctx, jsonx.AsM(res["status"]), note)
 	}
 	compareText := ""
 	if path := jsonx.S(res, "compare"); path != "" { // 골든 비교표가 있는 워크로드만
@@ -121,9 +128,13 @@ func runVerify(ctx *Context) (M, error) {
 }
 
 // verifyStatusOnly 는 상태 파일의 require 만으로 판정한다. 파일을 읽지 못하면 NO-RESULT (워크로드가 돌지 않았다).
-func verifyStatusOnly(ctx *Context, st M) (M, error) {
+func verifyStatusOnly(ctx *Context, st M, notes ...string) (M, error) {
 	path := jsonx.S(st, "path")
-	v := M{"result": "PASS", "summary": "상태 파일 " + path, "metrics": M{}, "warn": []any{}}
+	warn := []any{}
+	for _, n := range notes {
+		warn = append(warn, n)
+	}
+	v := M{"result": "PASS", "summary": "상태 파일 " + path, "metrics": M{}, "warn": warn}
 	if _, ok, err := ctx.ReadText("target", path); err != nil || !ok {
 		v = M{"result": "NO-RESULT", "summary": fmt.Sprintf("상태 파일 %s 를 읽지 못함 — 워크로드가 돌지 않았다", path), "warn": []any{}}
 		return finishVerdict(ctx, v), nil
