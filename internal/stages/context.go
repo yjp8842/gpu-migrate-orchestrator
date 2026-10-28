@@ -56,6 +56,7 @@ type Tumblebug interface {
 type Beetle interface {
 	RecommendInfra(req M, limit int) ([]any, error)
 	MigrateInfra(ns string, body M, nameSeed string, useExisting bool, timeout time.Duration) (M, error)
+	ValidateInfra(ns string, body M, useExisting bool) (M, error)
 	ListInfraIDs(ns string) ([]string, error)
 	DeleteInfra(ns, id string) (any, error)
 	EncryptionKey() (M, error)
@@ -561,6 +562,9 @@ func (c *Context) Dry(stage, what string, payload any) {
 		items = jsonx.AsList(v)
 	}
 	items = append(items, M{"what": what, "payload": payload})
-	jsonx.WriteFile(path, items)
+	// 보낼 요청 본문에는 검증용 비밀번호 같은 값이 실리므로 가려서 쓴다 (증적으로 나간다)
+	if b, err := jsonx.Marshal(items, true); err == nil {
+		os.WriteFile(path, append([]byte(logx.Mask(string(b))), '\n'), 0o644)
+	}
 	c.Log.Info(stage, "dry-run: %s", what)
 }

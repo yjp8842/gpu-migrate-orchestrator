@@ -8,3 +8,7 @@ __pycache__/
 *.pyc
 .env
 legacy-python/
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+cases/console/

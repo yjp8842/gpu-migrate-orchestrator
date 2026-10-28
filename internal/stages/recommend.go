@@ -240,6 +240,9 @@ func runRecommend(ctx *Context) (M, error) {
 	if _, err := ctx.WriteJSON(stRecommend, "candidates.json", cands); err != nil {
 		return nil, err
 	}
+	if why := nothingToRecommend(cands); why != "" {
+		return nil, Errf("Beetle 이 추천하지 못했습니다 (%s/%s): %s — 후보 원문은 recommend/candidates.json", jsonx.S(tgt, "csp"), jsonx.S(tgt, "region"), why)
+	}
 	idx, reason := policy.SelectCandidate(cands, src, jsonx.S(pol, "gpu"))
 	if idx < 0 {
 		return nil, Errf("후보 %d개 중 정책에 맞는 것이 없습니다 (%s)", len(cands), reason)
@@ -290,8 +293,67 @@ func runRecommend(ctx *Context) (M, error) {
 	for _, c := range changes {
 		lines = append(lines, "  - "+c)
 	}
+	vLines, vErr := precheckCreate(ctx, b, ns, adjusted)
+	lines = append(lines, vLines...)
 	if _, err := ctx.WriteText(stRecommend, "rationale.md", strings.Join(lines, "\n")); err != nil {
 		return nil, err
 	}
+	if vErr != nil {
+		return nil, vErr
+	}
 	return M{"candidate": idx, "changes": changes}, nil
+}
+
+// nothingToRecommend 는 Beetle 후보가 모두 status=nothing-to-recommend 이면 그 설명을 돌려준다 (아니면 "").
+// Beetle 은 맞는 사양 · 이미지가 없을 때도 빈 목록 대신 사양 없는 후보 하나에 이 상태와 이유를 담아 준다.
+func nothingToRecommend(cands []any) string {
+	why := ""
+	for _, c := range cands {
+		m := jsonx.AsM(c)
+		if jsonx.S(m, "status") != "nothing-to-recommend" {
+			return ""
+		}
+		if why == "" {
+			why = jsonx.SOr(m, "description", "nothing-to-recommend")
+		}
+	}
+	return why
+}
+
+// precheckCreate 는 생성 가능 사전 검사다. 보정까지 끝난 생성 요청을 Beetle 검증 API 에 보내(자원을 만들지 않는다)
+// 생성 직전에 Beetle 이 다시 할 검사 — 사양 · 이미지 호환, 필수 값, 연결 이름 — 를 미리 받는다.
+// 10/27 AWS → NCP: 추천은 나왔지만 T4(XEN) 사양과 KVM 이미지가 맞지 않아 생성에서 거부됐다 → 이제 추천 단계에서 멈춘다.
+// 이름 충돌(RESOURCE_ALREADY_EXISTS)은 생성 때 nameSeed 가 이름 앞에 붙어 달라지므로 막지 않고 참고로만 적는다.
+// 검증 API 를 부르지 못하면 막지 않는다 — 생성 단계에서 Beetle 이 같은 검사를 다시 한다.
+func precheckCreate(ctx *Context, b Beetle, ns string, body M) ([]string, error) {
+	lines := []string{"", "## 생성 가능 사전 검사 (Beetle validation)"}
+	res, err := b.ValidateInfra(ns, body, false)
+	if err != nil {
+		ctx.Log.Warn(stRecommend, "생성 가능 사전 검사를 하지 못했습니다 (Beetle 검증 API): %v — 생성 단계에서 Beetle 이 다시 검사합니다", err)
+		ctx.State.SetKey("target_validation", M{"checked": false, "error": err.Error()})
+		return append(lines, "- 검사 못 함 — "+err.Error()), nil
+	}
+	if _, err := ctx.WriteJSON(stRecommend, "validation.json", res); err != nil {
+		return lines, err
+	}
+	issues := jsonx.ListM(res["issues"])
+	var block []string
+	for _, is := range issues {
+		code, msg := jsonx.S(is, "code"), jsonx.S(is, "message")
+		if jsonx.S(is, "severity") == "error" && code != "RESOURCE_ALREADY_EXISTS" {
+			block = append(block, fmt.Sprintf("%s: %s", code, msg))
+			lines = append(lines, fmt.Sprintf("- 막힘 %s — %s", code, msg))
+		} else {
+			lines = append(lines, fmt.Sprintf("- 참고 %s (%s) — %s", code, jsonx.S(is, "severity"), msg))
+		}
+	}
+	ctx.State.SetKey("target_validation", M{"checked": true, "valid": len(block) == 0, "issues": issues})
+	if len(block) > 0 {
+		return lines, Errf("생성 가능 사전 검사 실패 — %s (자원은 만들지 않았습니다 · recommend/validation.json)", strings.Join(block, " / "))
+	}
+	if len(issues) == 0 {
+		lines = append(lines, "- 통과 — 사양 · 이미지 호환 · 필수 값 · 연결 이름")
+	}
+	ctx.Log.Info(stRecommend, "생성 가능 사전 검사 통과 (Beetle validation)")
+	return lines, nil
 }

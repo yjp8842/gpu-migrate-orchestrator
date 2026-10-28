@@ -136,6 +136,21 @@ type fakeBeetle struct {
 	// 생성 시도별 오류 (차례로 쓰고, 다 쓰면 b.migrate 를 돌려준다) · 보낸 본문
 	migrateErrs []error
 	migrateSent []M
+	// 생성 가능 사전 검사 — 돌려줄 결과 · 오류, 부른 횟수
+	valid     M
+	validErr  error
+	validated int
+}
+
+func (b *fakeBeetle) ValidateInfra(ns string, body M, use bool) (M, error) {
+	b.validated++
+	if b.validErr != nil {
+		return nil, b.validErr
+	}
+	if b.valid != nil {
+		return b.valid, nil
+	}
+	return M{"valid": true, "issues": []any{}}, nil
 }
 
 func (b *fakeBeetle) RecommendInfra(req M, limit int) ([]any, error) { b.called++; return b.cands, nil }
@@ -335,6 +350,64 @@ func TestRecommendPlaceholderFlagged(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(ctx.RunDir, "recommend", "rationale.md"))
 	if !strings.Contains(string(b), "자리표시자") || strings.Contains(string(b), "NVIDIA NVIDIA") {
 		t.Fatal(string(b))
+	}
+}
+
+// 생성 가능 사전 검사 — Beetle 검증이 사양 · 이미지 호환을 거부하면 추천 단계에서 멈춘다 (10/27 AWS → NCP)
+func TestRecommendPrecheckBlocks(t *testing.T) {
+	b := &fakeBeetle{cands: liveCands(t), valid: M{"valid": false, "issues": []any{
+		M{"code": "SPEC_IMAGE_INCOMPATIBLE", "severity": "error", "path": "targetInfra.nodeGroups[0]",
+			"message": "VM spec 'ncp+kr+gp1t4-g1-h50' and image '23789321' are incompatible for CSP 'ncp'"}}}}
+	ctx := newCtx(t, &fakeTB{}, b, true)
+	writeModel(t, ctx)
+	_, err := runRecommend(ctx)
+	if err == nil || !strings.Contains(err.Error(), "생성 가능 사전 검사 실패") || !strings.Contains(err.Error(), "SPEC_IMAGE_INCOMPATIBLE") {
+		t.Fatal(err)
+	}
+	if b.validated != 1 {
+		t.Fatal(b.validated)
+	}
+	if v := jsonx.AsM(ctx.State.Key("target_validation")); v["valid"] != false {
+		t.Fatal(v)
+	}
+	readJSON(t, ctx, "recommend", "validation.json")
+	rb, _ := os.ReadFile(filepath.Join(ctx.RunDir, "recommend", "rationale.md"))
+	if !strings.Contains(string(rb), "막힘 SPEC_IMAGE_INCOMPATIBLE") {
+		t.Fatal(string(rb))
+	}
+}
+
+// 이름 충돌은 nameSeed 로 이름이 바뀌므로 막지 않는다 · 검증 API 를 못 부르면 막지 않는다
+func TestRecommendPrecheckNonBlocking(t *testing.T) {
+	b := &fakeBeetle{cands: liveCands(t), valid: M{"valid": false, "issues": []any{
+		M{"code": "RESOURCE_ALREADY_EXISTS", "severity": "error", "path": "targetVNet.name", "message": "vNet 'vnet-01' already exists"}}}}
+	ctx := newCtx(t, &fakeTB{}, b, true)
+	writeModel(t, ctx)
+	if _, err := runRecommend(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if v := jsonx.AsM(ctx.State.Key("target_validation")); v["valid"] != true {
+		t.Fatal(v)
+	}
+	b2 := &fakeBeetle{cands: liveCands(t), validErr: errors.New("HTTP 404")}
+	ctx2 := newCtx(t, &fakeTB{}, b2, true)
+	writeModel(t, ctx2)
+	if _, err := runRecommend(ctx2); err != nil {
+		t.Fatal(err)
+	}
+	if v := jsonx.AsM(ctx2.State.Key("target_validation")); v["checked"] != false {
+		t.Fatal(v)
+	}
+}
+
+// Beetle 이 nothing-to-recommend 후보만 주면 그 이유를 그대로 알린다 (10/27 GCP L4 → NCP)
+func TestRecommendNothingToRecommend(t *testing.T) {
+	b := &fakeBeetle{cands: []any{M{"status": "nothing-to-recommend", "description": "No compatible VM spec and OS image pairs found for GPU infrastructure."}}}
+	ctx := newCtx(t, &fakeTB{}, b, true)
+	writeModel(t, ctx)
+	_, err := runRecommend(ctx)
+	if err == nil || !strings.Contains(err.Error(), "No compatible VM spec") {
+		t.Fatal(err)
 	}
 }
 
@@ -1009,5 +1082,20 @@ func TestSummaryRewrittenAfterNoteAndFinalStatus(t *testing.T) {
 	s := read()
 	if !strings.Contains(s, "| cleanup | done |") || !strings.Contains(s, "[verify] 증적 폴더를 다시 받으려고 verify 재실행") || strings.Contains(s, "- 없음") {
 		t.Fatalf("note · 최종 상태가 요약에 반영되지 않았다:\n%s", s)
+	}
+}
+
+// 소스 vNet 이 /16 보다 넓으면 노드 서브넷 대역으로 추천받는다 (10/27 GCP 10.0.0.0/13 → AWS 에서 Beetle 이 vNet 을 비움)
+func TestSourceNetworkCIDR(t *testing.T) {
+	for _, c := range [][3]string{
+		{"10.0.0.0/13", "10.2.0.0/16", "10.2.0.0/16"},
+		{"10.2.0.0/16", "10.2.0.0/16", "10.2.0.0/16"},
+		{"10.0.0.0/13", "", "10.0.0.0/13"},
+		{"", "10.2.0.0/16", ""},
+		{"172.16.0.0/12", "172.16.1.0/24", "172.16.1.0/24"},
+	} {
+		if got := sourceNetworkCIDR(c[0], c[1]); got != c[2] {
+			t.Fatalf("%v → %s", c, got)
+		}
 	}
 }

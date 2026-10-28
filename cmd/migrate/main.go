@@ -6,6 +6,7 @@
 //	migrate note     --case cases/X.yaml [--stage 단계] "사람이 한 조치"   수동 개입 기록 (수작업 유발 구간 목록의 원천) — summary.md 도 다시 쓴다
 //	migrate summary  --case cases/X.yaml [--run RUN|latest]       summary.md 만 다시 쓴다 (state.json 기준, 원격 호출 없음)
 //	migrate beetle-selftest                                       Beetle 데이터 이관 암호화 형식 자가 확인
+//	migrate serve    [--addr 127.0.0.1:5180]                      화면 + Facade API (이관은 migrate run 을 별도 프로세스로)
 //
 // 공통: --settings settings.yaml (기본 프로젝트의 settings.yaml, 없으면 settings.example.yaml)
 // 환경변수: 설정 · 사례의 ${이름} 을 채운다. 프로젝트 폴더의 .env 를 먼저 읽는다 (견본 .env.example)
@@ -21,10 +22,12 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 
+	"gpu-migrate-orchestrator/api"
 	"gpu-migrate-orchestrator/internal/beetle"
 	"gpu-migrate-orchestrator/internal/config"
 	"gpu-migrate-orchestrator/internal/crypto"
@@ -33,6 +36,7 @@ import (
 	"gpu-migrate-orchestrator/internal/stages"
 	"gpu-migrate-orchestrator/internal/state"
 	"gpu-migrate-orchestrator/internal/tumblebug"
+	"gpu-migrate-orchestrator/web"
 )
 
 const usage = `migrate — GPU 추론서비스 이관 오케스트레이터
@@ -44,14 +48,15 @@ const usage = `migrate — GPU 추론서비스 이관 오케스트레이터
   migrate note     --case cases/X.yaml [--run latest] [--stage 단계] "사람이 한 조치"
   migrate summary  --case cases/X.yaml [--run latest]           summary.md 만 다시 쓴다
   migrate beetle-selftest
+  migrate serve    [--addr 127.0.0.1:5180]                      화면 + Facade API
 
   공통: --settings settings.yaml
   종료 코드: 0 정상 · 1 판정 FAIL / NO-RESULT · 2 오류
 `
 
 type opts struct {
-	settings, casePath, resume, runID, from, to, stage, noteStage, text string
-	dryRun, quiet                                                       bool
+	settings, casePath, resume, runID, from, to, stage, noteStage, text, addr string
+	dryRun, quiet                                                             bool
 }
 
 // splitSettings 는 --settings 를 하위 명령 앞뒤 어디에 써도 받는다.
@@ -146,6 +151,8 @@ func run(argv []string) int {
 	case cmd == "summary":
 		fs.StringVar(&o.runID, "run", "latest", "")
 	case cmd == "beetle-selftest":
+	case cmd == "serve":
+		fs.StringVar(&o.addr, "addr", "127.0.0.1:5180", "")
 	default:
 		fmt.Fprintf(os.Stderr, "[migrate] 모르는 명령: %s\n\n%s", cmd, usage)
 		return 2
@@ -161,7 +168,7 @@ func run(argv []string) int {
 		fmt.Fprintf(os.Stderr, "[migrate] 알 수 없는 인자: %v\n", pos)
 		return 2
 	}
-	if cmd != "beetle-selftest" && o.casePath == "" {
+	if cmd != "beetle-selftest" && cmd != "serve" && o.casePath == "" {
 		fmt.Fprintln(os.Stderr, "[migrate] --case 가 필요합니다")
 		return 2
 	}
@@ -183,6 +190,8 @@ func run(argv []string) int {
 		rc, err = cmdSummary(o)
 	case cmd == "beetle-selftest":
 		rc, err = cmdSelftest(o)
+	case cmd == "serve":
+		rc, err = cmdServe(o)
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[migrate] 오류: %v\n", err)
@@ -517,4 +526,31 @@ func cmdSelftest(o opts) (int, error) {
 	raw, _ := jsonx.Marshal(dec, false)
 	log.Warn("", "복호 결과가 다릅니다: %q · %q (기대 %q · %q) — 응답: %.300s", g1, g2, crypto.SelftestSamples[0], crypto.SelftestSamples[1], string(raw))
 	return 1, nil
+}
+
+// cmdServe 는 화면과 Facade API 를 낸다. 이관은 이 실행 파일을 migrate run 으로 다시 띄워서 한다.
+func cmdServe(o opts) (int, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return 2, err
+	}
+	if real, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = real
+	}
+	maxRuns := 2
+	if v := os.Getenv("GMP_CONSOLE_MAX_RUNS"); v != "" {
+		if maxRuns, err = strconv.Atoi(v); err != nil || maxRuns < 1 {
+			return 2, config.Errf("GMP_CONSOLE_MAX_RUNS 는 1 이상 정수: %q", v)
+		}
+	}
+	srv := &api.Server{Root: config.ProjectRoot(), SettingsPath: o.settings, Exe: exe, Web: web.Dist(), MaxRuns: maxRuns}
+	if _, err := config.LoadSettings(o.settings); err != nil {
+		return 2, err
+	}
+	screen := "화면 + API"
+	if srv.Web == nil {
+		screen = "API 만 — 화면은 make build 로 다시 빌드"
+	}
+	fmt.Printf("GPU 이관 콘솔 (%s · 동시 run %d · 오케스트레이터 %s)\n  http://%s\n", screen, maxRuns, srv.Root, o.addr)
+	return 2, srv.ListenAndServe(o.addr)
 }

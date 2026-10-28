@@ -261,6 +261,21 @@ func (c *Client) RecommendInfra(request M, limit int) ([]any, error) {
 	return jsonx.AsList(d), nil
 }
 
+// ValidateInfra 는 생성 요청 사전 검사 (POST /validation/ns/{ns}/infra) → {valid, issues[{code, severity, path, message}]}.
+// MigrateInfra 가 만들기 직전에 하는 검사(사양 · 이미지 호환, 필수 값, 연결 이름, 이름 충돌)를 자원 없이 미리 돌린다 — dry-run 에서도 부른다.
+// 검사에 걸려도 HTTP 200 (valid=false) 이고, 400 은 요청 형식 오류다.
+func (c *Client) ValidateInfra(ns string, body M, useExisting bool) (M, error) {
+	p := url.Values{"useExisting": {fmt.Sprint(useExisting)}}
+	d, err := c.data("POST", "/validation/ns/"+ns+"/infra", Opts{Body: body, Params: p, Timeout: 120 * time.Second, Write: boolp(false)})
+	if err != nil {
+		return nil, err
+	}
+	if m := jsonx.AsM(d); m != nil {
+		return m, nil
+	}
+	return nil, errf("Beetle 검증 응답을 읽지 못했습니다: %v", d)
+}
+
 // MigrateInfra 는 동기 생성 → MigrateInfraResponse (id · status · node[] · creationErrors). 자동 재시도 없음.
 func (c *Client) MigrateInfra(ns string, body M, nameSeed string, useExisting bool, timeout time.Duration) (M, error) {
 	p := url.Values{"useExisting": {fmt.Sprint(useExisting)}}

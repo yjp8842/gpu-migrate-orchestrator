@@ -1,6 +1,10 @@
 package state
 
-import "testing"
+import (
+	"os"
+	"strings"
+	"testing"
+)
 
 func TestCreateMarkResume(t *testing.T) {
 	d := t.TempDir()
@@ -43,4 +47,20 @@ func TestLockRejectsSecond(t *testing.T) {
 		t.Fatal("두 번째 잠금이 통과했다")
 	}
 	st.Unlock()
+}
+
+func TestSaveMasksSecrets(t *testing.T) {
+	d := t.TempDir()
+	st, _ := Create(d, "c", "x", "w", false)
+	st.SetKey("start_launched", map[string]any{"entry": map[string]any{"command": "LLM_SEED=42 VERIFY_ADMIN_PASSWORD=s3cr3t-value bash -lc x"}})
+	b, err := os.ReadFile(st.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "s3cr3t-value") || !strings.Contains(string(b), "VERIFY_ADMIN_PASSWORD=<masked>") {
+		t.Fatalf("state.json 에 비밀번호가 남음:\n%s", b)
+	}
+	if !st.HasKey("start_launched") {
+		t.Fatal("재개 표식이 없어짐")
+	}
 }
