@@ -1084,3 +1084,18 @@ func TestSummaryRewrittenAfterNoteAndFinalStatus(t *testing.T) {
 		t.Fatalf("note · 최종 상태가 요약에 반영되지 않았다:\n%s", s)
 	}
 }
+
+// 소스 vNet 이 /16 보다 넓으면 노드 서브넷 대역으로 추천받는다 (10/27 GCP 10.0.0.0/13 → AWS 에서 Beetle 이 vNet 을 비움)
+func TestSourceNetworkCIDR(t *testing.T) {
+	for _, c := range [][3]string{
+		{"10.0.0.0/13", "10.2.0.0/16", "10.2.0.0/16"},
+		{"10.2.0.0/16", "10.2.0.0/16", "10.2.0.0/16"},
+		{"10.0.0.0/13", "", "10.0.0.0/13"},
+		{"", "10.2.0.0/16", ""},
+		{"172.16.0.0/12", "172.16.1.0/24", "172.16.1.0/24"},
+	} {
+		if got := sourceNetworkCIDR(c[0], c[1]); got != c[2] {
+			t.Fatalf("%v → %s", c, got)
+		}
+	}
+}

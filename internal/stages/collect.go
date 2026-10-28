@@ -7,6 +7,8 @@ package stages
 // VM 안의 상태(서비스 · LLM 설정 · 식별 정보)는 Tumblebug 가 모르므로 package 단계가 소스에 원격 명령을 보낼 때 함께 읽는다.
 
 import (
+	"net"
+
 	"gpu-migrate-orchestrator/internal/jsonx"
 	"gpu-migrate-orchestrator/internal/sourcemodel"
 	"gpu-migrate-orchestrator/internal/tumblebug"
@@ -105,7 +107,11 @@ func runCollect(ctx *Context) (M, error) {
 			return nil, Errf("스펙 %s 를 Tumblebug 에서 찾지 못했습니다", sid)
 		}
 		rows = append(rows, sourcemodel.Row{Node: n, Spec: spec, Image: jsonx.AsM(images[iid]), SubnetCIDR: subnet, Rules: rules})
-		cidrs = append(cidrs, jsonx.S(v, "cidrBlock"))
+		cidr := sourceNetworkCIDR(jsonx.S(v, "cidrBlock"), subnet)
+		if cidr != jsonx.S(v, "cidrBlock") {
+			ctx.Log.Info(stCollect, "소스 vNet %s 가 /16 보다 넓어 노드 서브넷 %s 로 추천받는다 (AWS VPC 는 /16 ~ /28)", jsonx.S(v, "cidrBlock"), cidr)
+		}
+		cidrs = append(cidrs, cidr)
 	}
 	model := sourcemodel.Build(rows, cidrs, driver, ports)
 	if _, err := ctx.WriteJSON(stCollect, "source-model.json", model); err != nil {
@@ -169,4 +175,18 @@ func orM(a, b M) M {
 		return b
 	}
 	return M{}
+}
+
+// sourceNetworkCIDR 는 Beetle 추천에 넘길 소스 네트워크 대역이다. vNet 이 /16 보다 넓으면(예: Beetle 이 만든 GCP vNet 10.0.0.0/13)
+// AWS 처럼 VPC 를 /16 ~ /28 로만 받는 CSP 에서 Beetle 이 vNet 을 비워 추천하므로(10/27 GCP → AWS), 노드가 있는 서브넷 대역을 쓴다.
+// 서브넷을 모르거나 vNet 대역을 읽지 못하면 vNet 대역 그대로.
+func sourceNetworkCIDR(vnetCIDR, subnetCIDR string) string {
+	_, vn, err := net.ParseCIDR(vnetCIDR)
+	if err != nil || subnetCIDR == "" {
+		return vnetCIDR
+	}
+	if ones, _ := vn.Mask.Size(); ones < 16 {
+		return subnetCIDR
+	}
+	return vnetCIDR
 }
