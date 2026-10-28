@@ -1,13 +1,23 @@
 # LexAI (YunHwa0905/legal-rag-chatbot feat/sqlite) · Docker Compose(B).
 # 순서는 저장소 deploy/compose/README.md 「Beetle 로 이관」과 같다: 소스 backup → Beetle 2건(패키지 · 배포 디렉터리) → 타겟에서 옮겨 온 deploy.sh.
 # DB · 색인은 Docker 볼륨 안이라 홈 디렉터리 전송으로는 옮겨지지 않는다 — 반드시 패키지로 옮긴다.
+# 이관 동등성 비교 (legal-rag-chatbot 716a57b 이후) — backup 이 패키지에 비교 기준(source-info.json · golden.json ·
+# package-files.tsv)을 남기고, 타겟이 기동 뒤 대조해 ~/lexai-run/migration-compare.csv · migration-<시각>/ 을 남긴다.
+# 형식 · 판정 기준은 WidgetRAG 와 같다 — 판정 단계가 결과표(results.csv, RUN_VERIFY=1 이 만든다)와 같은 시각의 비교 행을 함께 본다.
+# 답변 문장까지 비교하려면 소스 · 타겟 모두 온도 0 · seed 고정이어야 한다 — 사례 run.env 의 LLM_TEMPERATURE · LLM_SEED 를
+# 백업 전에 소스 .env 의 gmp-golden 블록으로 넣고 AI 서버를 다시 띄운다(restart). .env 는 타겟으로 함께 옮겨져 타겟도 같은 값이 되고,
+# 정리 단계(source_restore)가 블록을 지워 소스를 원래 값(0.1 · -1)으로 되돌린다.
 workload: lexai
 form: compose
 entry: "NO_UPDATE=1 SNAPSHOT_URI={package_dir} {env} bash ~/lexai-compose/deploy.sh"
 proc_pattern: "lexai-compose/deploy.sh"
-backup: "OUT_DIR={out_dir} STOP_WRITES=1 bash ~/lexai-compose/backup.sh"
+backup: "OUT_DIR={out_dir} STOP_WRITES=1 GOLDEN={golden} bash ~/lexai-compose/backup.sh"
+# 백업 전 소스 재기동 (run.rebuild_before_backup) — .env 에 비교용 생성 설정을 넣고 AI 서버만 다시 띄운 뒤 /health 가 응답할 때까지 기다린다.
+# .env 의 COMPOSE_FILE 이 registry · lock 정의를 고르므로 -f 없이 부른다.
+restart: "cd ~/lexai-compose && sed -i '/^# >>> gmp-golden/,/^# <<< gmp-golden/d' .env && printf '%s\n' '# >>> gmp-golden — 오케스트레이터가 이관 비교용으로 넣음 (정리 단계 source_restore 가 지운다)' {source_env} '# <<< gmp-golden' >> .env && sudo docker compose up -d --no-build ai && ok=0 && for i in $(seq 120); do curl -sf --max-time 5 http://127.0.0.1:8000/api/v1/health >/dev/null && ok=1 && break; sleep 5; done && test $ok = 1 || (echo 'AI 서버 재기동 실패 — 10분 안에 127.0.0.1:8000/api/v1/health 가 응답하지 않음. 소스가 AI 포트를 VM 안에 여는 LexAI(0220374 이후)로 배포됐는지 확인' >&2; exit 1)"
 backup_out: "~/lexai-backup/{ts}"
 package_dir: "~/lexai-backup/latest"
+package_marker: package-files.tsv   # backup.sh 가 맨 마지막에 쓰는 파일 — 있으면 재개 때 backup 을 건너뛴다
 transfer:
   - { from: "{backup_out}/", to: "{package_dir}", fresh: true, verify: true }
   - from: "~/lexai-compose/"
@@ -21,6 +31,9 @@ done:
   success: [success]
   failure: [failed]
 results:
+  csv: "~/lexai-run/results.csv"                    # verify.sh — 사례 run.env 에 RUN_VERIFY=1 이 있어야 생긴다
+  compare: "~/lexai-run/migration-compare.csv"      # migcompare.py — 비교 행 (T1-1 서비스 · T1-2 패키지 · T1-3 데이터 · T2 응답)
+  evidence: "~/lexai-run/migration-*"               # 증적 폴더 migration-<시각>/ (summary.txt · rows.tsv · golden.json · golden-diff/)
   status:
     path: ~/lexai-run/status.json
     require: { state: [success], data_check: [PASS] }
@@ -30,7 +43,16 @@ logs:
 resume_unit: lexai-compose-resume
 existing_check: "sudo docker volume ls -q 2>/dev/null | grep -E '_(lexai_data|opensearch_data)$'"
 existing_env: "FORCE_CLEAN=1"
-source_restore: "cd ~/lexai-compose && sudo docker compose start frontend tomcat"
+# 소스 되돌리기 — 비교용 생성 설정(gmp-golden 블록)을 지우고 AI 서버를 원래 값으로 다시 띄운 뒤, 백업 때 멈춘 frontend · tomcat 을 켠다
+source_restore: "cd ~/lexai-compose && sed -i '/^# >>> gmp-golden/,/^# <<< gmp-golden/d' .env && sudo docker compose up -d --no-build ai && sudo docker compose start frontend tomcat"
+# 판정 단계가 타겟에서 받아 run 폴더 verify/target/ 에 두는 것 — 판정과 무관하게 받는다 (테스트 이력)
+diagnostics:
+  - { name: services.log, command: "cd ~/lexai-compose && sudo docker compose logs --no-color --timestamps | tail -n 50000" }
+  - { name: containers.txt, command: "cd ~/lexai-compose && sudo docker compose ps -a" }
+  - { name: gpu.txt, command: "nvidia-smi; nvidia-smi --query-gpu=name,driver_version,memory.used,memory.total --format=csv" }
+  - { name: models.txt, command: "cd ~/lexai-compose && sudo docker compose exec -T ollama sh -c 'ollama list; ollama ps'" }
+  - { name: health.json, command: "curl -s --max-time 5 http://127.0.0.1:8000/api/v1/health" }
+  - { name: data-check.txt, command: "cat ~/lexai-run/data-check.txt" }
 services: [opensearch, ollama, ai, tomcat, frontend]
 identify:
   compose: [~/lexai-compose/docker-compose.yml, ~/lexai-compose/docker-compose.registry.yml, ~/lexai-compose/docker-compose.lock.yml]
@@ -38,3 +60,5 @@ identify:
   tree: ~/lexai-compose
   code_ref: "cut -c1-7 ~/lexai-compose/DEPLOY_COMMIT 2>/dev/null || echo unknown"
   packages: [docker-ce, nvidia-container-toolkit]
+# 소스 AI 서버 상태 — 백업 전에 온도 · seed(llm_temperature · llm_seed)가 사례 run.env 와 같은지 본다 (docker-compose.yml 이 127.0.0.1:8000 만 연다)
+health: "http://127.0.0.1:8000/api/v1/health"

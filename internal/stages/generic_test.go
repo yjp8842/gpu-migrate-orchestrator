@@ -266,6 +266,33 @@ func TestVerifyStatusRequire(t *testing.T) {
 	}
 }
 
+// 결과표를 켜야 생기는 워크로드에서 결과표가 없으면 상태 파일로만 판정하고, 그렇다고 WARN 에 남긴다.
+func TestVerifyMissingResultsFallsBackToStatus(t *testing.T) {
+	route := func(cmd string) string {
+		switch {
+		case strings.Contains(cmd, "x-run/results.csv"):
+			return rcMarker + "3\n"
+		case strings.Contains(cmd, "x-run/status.json"):
+			return `{"state": "success", "data_check": "PASS"}` + "\n" + rcMarker + "0\n"
+		}
+		return rcMarker + "0\n"
+	}
+	ctx, _ := startCtx(t, M{"results": M{"csv": "~/x-run/results.csv",
+		"status": M{"path": "~/x-run/status.json", "require": M{"data_check": []any{"PASS"}}}}}, route)
+	v, err := runVerify(ctx)
+	if err != nil || jsonx.S(v, "result") != "PASS" {
+		t.Fatal(v, err)
+	}
+	if w := jsonx.Strings(v["warn"]); len(w) != 1 || !strings.Contains(w[0], "RUN_VERIFY=1") {
+		t.Fatal("결과표가 없다는 것을 남기지 않았다", v)
+	}
+	// 상태 파일이 없는 어댑터는 그대로 NO-RESULT (WidgetRAG)
+	ctx2, _ := startCtx(t, M{"results": M{"csv": "~/x-run/results.csv"}}, route)
+	if v, err := runVerify(ctx2); err != nil || jsonx.S(v, "result") != "NO-RESULT" {
+		t.Fatal("상태 파일이 없는 어댑터에서 결과표가 없는데 NO-RESULT 가 아니다", v, err)
+	}
+}
+
 // ---------- 정리 ----------
 
 func TestCleanupBeetleTerminateRestoreAndStaging(t *testing.T) {

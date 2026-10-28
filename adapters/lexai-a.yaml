@@ -1,6 +1,12 @@
 # LexAI (YunHwa0905/legal-rag-chatbot feat/sqlite) · 네이티브(A).
 # 순서는 저장소 deploy/native/README.md 「VM 이관」과 같다: 소스 backup → Beetle 2건(패키지 · 저장소) → 타겟에서 옮겨 온 스크립트로 기동.
-# 결과표가 없고 ~/lexai-run/status.json 하나로 진행 · 판정을 알린다 (값은 모두 문자열).
+# 진행 · 기동 판정은 ~/lexai-run/status.json (값은 모두 문자열).
+# 이관 동등성 비교 (legal-rag-chatbot 716a57b 이후) — backup 이 패키지에 비교 기준(source-info.json · golden.json ·
+# package-files.tsv)을 남기고, 타겟이 기동 뒤 대조해 ~/lexai-run/migration-compare.csv · migration-<시각>/ 을 남긴다.
+# 형식 · 판정 기준은 WidgetRAG 와 같다 — 판정 단계가 결과표(results.csv, RUN_VERIFY=1 이 만든다)와 같은 시각의 비교 행을 함께 본다.
+# 답변 문장까지 비교하려면 소스 · 타겟 모두 온도 0 · seed 고정이어야 한다 — 사례 run.env 의 LLM_TEMPERATURE · LLM_SEED 를
+# 백업 전에 소스 .env 의 gmp-golden 블록으로 넣고 AI 서버를 다시 띄운다(restart). .env 는 타겟으로 함께 옮겨져 타겟도 같은 값이 되고,
+# 정리 단계(source_restore)가 블록을 지워 소스를 원래 값(0.1 · -1)으로 되돌린다.
 workload: lexai
 form: shell
 # 타겟 진입 — 옮겨 온 저장소의 스크립트로 띄운다. curl 로 받으면 브랜치 최신본이라 옮겨 온 소스와 버전이 갈린다.
@@ -8,9 +14,13 @@ form: shell
 entry: "NO_UPDATE=1 SNAPSHOT_URI={package_dir} {env} bash ~/legal-rag-chatbot/deploy/native/bootstrap.sh"
 proc_pattern: "deploy/native/bootstrap.sh"
 # 소스 패키지 — 쓰기를 멈추고(frontend · tomcat 중지) 색인 스냅샷 + DB 를 만든다. 멈춘 서비스는 cleanup 의 source_restore 가 다시 켠다.
-backup: "OUT_DIR={out_dir} STOP_WRITES=1 bash ~/legal-rag-chatbot/deploy/native/backup.sh"
+backup: "OUT_DIR={out_dir} STOP_WRITES=1 GOLDEN={golden} bash ~/legal-rag-chatbot/deploy/native/backup.sh"
+# 백업 전 소스 재기동 (run.rebuild_before_backup) — .env 에 비교용 생성 설정을 넣고 AI 서버만 다시 띄운다.
+# start.sh ai 가 .env 로 환경 파일을 다시 쓰고 /health 가 응답할 때까지 기다린다 (떠 있으면 건너뛰므로 먼저 멈춘다).
+restart: "cd ~/legal-rag-chatbot && sed -i '/^# >>> gmp-golden/,/^# <<< gmp-golden/d' .env && printf '%s\n' '# >>> gmp-golden — 오케스트레이터가 이관 비교용으로 넣음 (정리 단계 source_restore 가 지운다)' {source_env} '# <<< gmp-golden' >> .env && sudo systemctl stop lexai-ai && bash deploy/native/start.sh ai"
 backup_out: "~/lexai-backup/{ts}"
 package_dir: "~/lexai-backup/latest"
+package_marker: package-files.tsv   # backup.sh 가 맨 마지막에 쓰는 파일 — 있으면 재개 때 backup 을 건너뛴다
 transfer:
   - { from: "{backup_out}/", to: "{package_dir}", fresh: true, verify: true }
   - from: "~/legal-rag-chatbot/"        # NO_UPDATE=1 은 타겟에 저장소가 있어야 한다 (.env 도 함께 — 로그인 토큰 유지)
@@ -24,6 +34,9 @@ done:
   success: [success]
   failure: [failed]
 results:
+  csv: "~/lexai-run/results.csv"                    # verify.sh — 사례 run.env 에 RUN_VERIFY=1 이 있어야 생긴다
+  compare: "~/lexai-run/migration-compare.csv"      # migcompare.py — 비교 행 (T1-1 서비스 · T1-2 패키지 · T1-3 데이터 · T2 응답)
+  evidence: "~/lexai-run/migration-*"               # 증적 폴더 migration-<시각>/ (summary.txt · rows.tsv · golden.json · golden-diff/)
   status:
     path: ~/lexai-run/status.json
     require: { state: [success], data_check: [PASS] }   # data_check = 테이블별 행 수 · 내용 대조 (데이터 보존)
@@ -34,7 +47,16 @@ resume_unit: lexai-bootstrap-resume
 # 기존 설치(DB · 서비스 유닛 · 스냅샷)가 있으면 bootstrap 이 이관 모드에서 멈춘다 — 미리 보고 사례 run.on_existing 으로 정한다
 existing_check: "{ ls ~/lexai-data/lexai.db /etc/systemd/system/lexai-tomcat.service; ls -A ~/lexai-snapshots; } 2>/dev/null | grep ."
 existing_env: "FORCE_CLEAN=1"
-source_restore: "sudo systemctl start lexai-tomcat lexai-frontend"
+# 소스 되돌리기 — 비교용 생성 설정(gmp-golden 블록)을 지우고 AI 서버를 원래 값으로 다시 띄운 뒤, 백업 때 멈춘 tomcat · frontend 를 켠다
+source_restore: "cd ~/legal-rag-chatbot && sed -i '/^# >>> gmp-golden/,/^# <<< gmp-golden/d' .env && sudo systemctl stop lexai-ai && bash deploy/native/start.sh ai && sudo systemctl start lexai-tomcat lexai-frontend"
+# 판정 단계가 타겟에서 받아 run 폴더 verify/target/ 에 두는 것 — 판정과 무관하게 받는다 (테스트 이력)
+diagnostics:
+  - { name: services-journal.log, command: "sudo journalctl -b -u lexai-opensearch -u ollama -u lexai-ai -u lexai-tomcat -u lexai-frontend --no-pager -o short-iso | tail -n 50000" }
+  - { name: units.txt, command: "systemctl --no-pager status lexai-opensearch ollama lexai-ai lexai-tomcat lexai-frontend" }
+  - { name: gpu.txt, command: "nvidia-smi; nvidia-smi --query-gpu=name,driver_version,memory.used,memory.total --format=csv" }
+  - { name: models.txt, command: "ollama list; ollama ps" }
+  - { name: health.json, command: "curl -s --max-time 5 http://127.0.0.1:8000/api/v1/health" }
+  - { name: data-check.txt, command: "cat ~/lexai-run/data-check.txt" }
 services: [lexai-opensearch, lexai-ai, lexai-tomcat, lexai-frontend, ollama]
 identify:
   units: [lexai-opensearch, lexai-ai, lexai-tomcat, lexai-frontend]
@@ -42,3 +64,5 @@ identify:
   tree: ~/legal-rag-chatbot
   packages: [openjdk-17-jdk, nodejs, python3.12]
   versions: ["ollama -v"]
+# 소스 AI 서버 상태 — 백업 전에 온도 · seed(llm_temperature · llm_seed)가 사례 run.env 와 같은지 본다
+health: "http://127.0.0.1:8000/api/v1/health"

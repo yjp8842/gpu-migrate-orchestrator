@@ -44,8 +44,13 @@ var workloads = []Workload{
 	{ID: "widgetrag-b", Label: "WidgetRAG Compose", Desc: "Docker Compose", Port: 80, run: runDoc{
 		Env:    map[string]string{"LLM_TEMPERATURE": "0", "LLM_SEED": "42", "COMPARE": "1", "VERIFY_ADMIN_PASSWORD": "${GMP_VERIFY_ADMIN_PASSWORD}"},
 		Golden: yes(), RebuildBeforeBackup: yes(), TimeoutStartMin: 75, OnExisting: "stop"}},
-	{ID: "lexai-a", Label: "LexAI 네이티브", Desc: "네이티브 설치", Port: 3000, run: runDoc{Env: map[string]string{}, TimeoutStartMin: 75, OnExisting: "stop"}},
-	{ID: "lexai-b", Label: "LexAI Compose", Desc: "Docker Compose", Port: 80, run: runDoc{Env: map[string]string{}, TimeoutStartMin: 75, OnExisting: "stop"}},
+	// LexAI — 결과표는 이관 때 verify.sh 를 켜야(RUN_VERIFY=1) 생긴다. 비교 기준(골든)은 backup 이 뜨고 타겟 deploy 가 대조한다.
+	{ID: "lexai-a", Label: "LexAI 네이티브", Desc: "네이티브 설치", Port: 3000, run: runDoc{
+		Env:    map[string]string{"LLM_TEMPERATURE": "0", "LLM_SEED": "42", "COMPARE": "1", "RUN_VERIFY": "1"},
+		Golden: yes(), RebuildBeforeBackup: yes(), TimeoutStartMin: 75, OnExisting: "stop"}},
+	{ID: "lexai-b", Label: "LexAI Compose", Desc: "Docker Compose", Port: 80, run: runDoc{
+		Env:    map[string]string{"LLM_TEMPERATURE": "0", "LLM_SEED": "42", "COMPARE": "1", "RUN_VERIFY": "1"},
+		Golden: yes(), RebuildBeforeBackup: yes(), TimeoutStartMin: 75, OnExisting: "stop"}},
 }
 
 func findWorkload(id string) (Workload, bool) {
