@@ -40,6 +40,25 @@ func TestSameModelFirstPicksT4(t *testing.T) {
 	}
 }
 
+// Beetle edge 는 NCP L4 처럼 Tumblebug 에 가격이 없는 사양을 costPerHour -1 로 그대로 내보낸다
+func TestUnpricedSpecIsNotCheapest(t *testing.T) {
+	cand := func(spec string, cost float64) any {
+		return M{"targetSpecList": []any{M{"cspSpecName": spec, "acceleratorModel": "NVIDIA L4", "acceleratorMemoryGB": 24, "costPerHour": cost}}}
+	}
+	l4 := M{"vendor": "NVIDIA", "model": "NVIDIA L4", "memoryTotalGB": 24}
+	i, why := SelectCandidate([]any{cand("gp1l4-g3", -1), cand("priced-l4", 1.2)}, l4, "same-model-first")
+	if i != 1 || !strings.Contains(why, "1.2/h") {
+		t.Fatal("가격이 있는 사양을 골라야 한다", i, why)
+	}
+	i, why = SelectCandidate([]any{cand("gp1l4-g3", -1), cand("gp1l8-g3", -1)}, l4, "same-model-first")
+	if i != 0 || !strings.Contains(why, "가격 미등록") || strings.Contains(why, "-1") {
+		t.Fatal("모두 미등록이면 Beetle 순서대로, 근거에는 가격 미등록", i, why)
+	}
+	if _, why := SelectCandidate([]any{cand("gp1l4-g3", -1)}, t4, "same-model-first"); !strings.Contains(why, "가격 미등록") {
+		t.Fatal(why)
+	}
+}
+
 func TestAdjustDiskImageAndPorts(t *testing.T) {
 	c := jsonx.AsList(load(t, "beetle-recommend.json")["data"])
 	cand := jsonx.AsM(c[1])

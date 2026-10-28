@@ -29,8 +29,9 @@ func gpuOfCandidate(c M) *gpuInfo {
 		return nil
 	}
 	s := specs[0]
+	// Tumblebug 에 가격이 없는 사양은 -1 로 온다 (NCP L4 등) — 0 이하는 가격 미등록으로 보고 가격 비교에서 뒤로 보낸다
 	cost, hasCost := jsonx.Float(s["costPerHour"])
-	return &gpuInfo{model: jsonx.S(s, "acceleratorModel"), vram: jsonx.F(s["acceleratorMemoryGB"]), cost: cost, hasCost: hasCost && cost != 0,
+	return &gpuInfo{model: jsonx.S(s, "acceleratorModel"), vram: jsonx.F(s["acceleratorMemoryGB"]), cost: cost, hasCost: hasCost && cost > 0,
 		spec: jsonx.Str(jsonx.Or(jsonx.Or(s["cspSpecName"], s["id"]), s["name"])), count: s["acceleratorCount"], vcpu: s["vCPU"], mem: s["memoryGiB"]}
 }
 
@@ -97,7 +98,7 @@ func SelectCandidate(cands []any, sourceGPU M, mode string) (int, string) {
 		}
 		if best != nil {
 			g := best.g
-			return best.i, fmt.Sprintf("같은 GPU 모델(%s) 중 가장 싼 %s (VRAM %sGB, %s/h) — LLM 완전 일치의 전제", g.model, g.spec, num(g.vram), costStr(g))
+			return best.i, fmt.Sprintf("같은 GPU 모델(%s) 중 가장 싼 %s (VRAM %sGB, %s) — LLM 완전 일치의 전제", g.model, g.spec, num(g.vram), costStr(g))
 		}
 	}
 	var best *scored
@@ -118,14 +119,14 @@ func SelectCandidate(cands []any, sourceGPU M, mode string) (int, string) {
 		note = "같은 모델이 없어 "
 	}
 	g := best.g
-	return best.i, fmt.Sprintf("%sVRAM 이상 중 가장 가까운 %s (%s %sGB, %s/h) — GPU 가 달라 테스트2 는 WARN", note, g.spec, g.model, num(g.vram), costStr(g))
+	return best.i, fmt.Sprintf("%sVRAM 이상 중 가장 가까운 %s (%s %sGB, %s) — GPU 가 달라 테스트2 는 WARN", note, g.spec, g.model, num(g.vram), costStr(g))
 }
 
 func costStr(g *gpuInfo) string {
 	if !g.hasCost {
-		return "None"
+		return "가격 미등록"
 	}
-	return fmt.Sprint(g.cost)
+	return fmt.Sprintf("%v/h", g.cost)
 }
 
 // ImageFits 는 추천 이미지가 정책과 맞는지 — (맞음, 이유). want 예 'ubuntu-24.04'.
