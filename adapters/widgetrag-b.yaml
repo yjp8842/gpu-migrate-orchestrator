@@ -4,12 +4,22 @@ workload: widgetrag
 form: compose
 repo_raw: https://raw.githubusercontent.com/ghd329/WidgetRAG
 branch: feat/20260922-change-sqlite
-entry: "set -o pipefail; curl -fsSL {repo_raw}/{branch}/scripts/compose/deploy.sh | {env} bash"
+# 타겟 진입 — 소스에서 옮겨 온 배포 디렉토리의 deploy.sh 로 띄운다 (NO_UPDATE=1: 저장소에서 받지 않고 사본 그대로).
+# deploy.sh · compose 2개 · package.sh · verify.sh · migcheck.py · .env 가 소스와 같은 버전이라 이미지 태그 · 판정 기준이 갈리지 않는다
+# (LexAI Compose 와 같은 방식). 사본이 없으면 deploy.sh 가 받지 않고 멈춘다
+entry: "NO_UPDATE=1 {env} bash ~/widgetrag-deploy/deploy.sh"
 rebuild: null                     # compose 는 재빌드가 없다 — 결정적 설정은 .env 에 있어 재기동만 (restart)
 restart: "cd ~/widgetrag-deploy && {source_env} bash deploy.sh"   # 소스용 — LLM 설정만 (COMPARE 가 붙으면 소스에서 이관 비교를 돈다)
 backup: "cd ~/widgetrag-deploy && GOLDEN={golden} RUNTIME=compose COMPOSE_DIR=$HOME/widgetrag-deploy bash package.sh backup {out_dir}"
 backup_out: "~/widgetrag-backup/{ts}"
 package_dir: "~/widgetrag-deploy/package"
+# Beetle 2건 — 패키지, 그다음 배포 디렉토리. package(위에서 받은 패키지) · snapshots(OpenSearch uid 1000 소유 — 타겟 deploy.sh 가
+# 만든다) · 볼륨 백업본은 빼고 옮긴다
+transfer:
+  - { from: "{backup_out}/", to: "{package_dir}", fresh: true, verify: true }
+  - from: "~/widgetrag-deploy/"
+    to: "~/widgetrag-deploy"
+    exclude: [package, snapshots, "upload-data.bak-*"]
 results:
   csv: "~/widgetrag-run/results.csv"
   compare: "~/widgetrag-run/migration-compare.csv"
@@ -17,7 +27,7 @@ results:
 logs:
   run: "~/tc-run.log"
   exit: "~/tc-run.exit"
-proc_pattern: "scripts/compose/deploy.sh"   # 기동 중인 진입 한 줄을 찾는 pgrep -f 패턴 (이미 돌면 다시 띄우지 않는다)
+proc_pattern: "widgetrag-deploy/deploy.sh"   # 기동 중인 진입 한 줄을 찾는 pgrep -f 패턴 (이미 돌면 다시 띄우지 않는다)
 package_marker: MANIFEST.txt     # package.sh backup 이 마지막에 쓰는 파일 — 있으면 재개 때 backup 을 건너뛴다
 resume_unit: widgetrag-compose-resume
 # 판정 단계가 타겟에서 받아 run 폴더 verify/target/ 에 두는 것 — 판정과 무관하게 받는다 (테스트 이력)

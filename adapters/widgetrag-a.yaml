@@ -5,8 +5,11 @@ workload: widgetrag
 form: shell
 repo_raw: https://raw.githubusercontent.com/ghd329/WidgetRAG
 branch: feat/20260922-change-sqlite
-# 타겟 진입 한 줄 — 패키지가 ~/widgetrag-package 에 있으면 SNAPSHOT_URI 없이 트리 전개 · 복원 · 기동 · 검증까지 간다
-entry: "set -o pipefail; curl -fsSL {repo_raw}/{branch}/scripts/local/bootstrap.sh | {env} bash"
+# 타겟 진입 한 줄 — 패키지가 ~/widgetrag-package 에 있으면 SNAPSHOT_URI 없이 트리 전개 · 복원 · 기동 · 검증까지 간다.
+# 소스에서 옮겨 온 실행 파일 층(app-tree.tar.gz) 안의 bootstrap.sh 로 들어간다 — 저장소에서 받으면 브랜치 최신본이라 소스와 버전이 갈린다.
+# 그 뒤 설치 · 판정 스크립트도 모두 같은 트리의 것을 쓴다 (LexAI 가 옮겨 온 저장소의 스크립트로 띄우는 것과 같은 방식).
+# 실행 파일 층이 없는 패키지(CODE_SOURCE=git — 소스가 Compose 등)만 저장소의 bootstrap.sh 로 들어간다
+entry: "set -o pipefail; t={package_dir}/app-tree.tar.gz; if [ -f $t ]; then tar -xzOf $t scripts/local/bootstrap.sh | {env} bash; else curl -fsSL {repo_raw}/{branch}/scripts/local/bootstrap.sh | {env} bash; fi"
 # 소스에서 backup 전에 — jar 안의 구 설정 사본 제거 + 골든 전제(temperature · seed)로 재기동. {source_env} 가 꼭 붙어야 한다
 rebuild: "cd ~/WidgetRAG/scripts/local && {source_env} ./40-start-apps.sh --rebuild"
 backup: "cd ~/WidgetRAG/scripts && GOLDEN={golden} RUNTIME=native bash package.sh backup {out_dir}"
